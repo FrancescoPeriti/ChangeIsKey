@@ -1,10 +1,11 @@
-datasets_folder="datasets"
-tokenization_folder="tokenization"
-embeddings_folder="contextualized_embeddings"
-attentions_folder="attentions"
-ft_models_folder="ft_models"
-labels_folder="labels"
-score_folder="scores"
+main_folder_data="/mimer/NOBACKUP/groups/cik_data/"
+datasets_folder="${main_folder_data}/datasets"
+tokenization_folder="${main_folder_data}/tokenization"
+embeddings_folder="${main_folder_data}/contextualized_embeddings"
+attentions_folder="${main_folder_data}/attentions"
+ft_models_folder="${main_folder_data}/ft_models"
+labels_folder="${main_folder_data}/labels"
+score_folder="${main_folder_data}/scores"
 
 # Absolute paths
 datasets_folder="$(realpath ${datasets_folder})"
@@ -16,6 +17,7 @@ labels_folder="$(realpath ${labels_folder})"
 score_folder="$(realpath ${score_folder})"
 
 module load PyTorch/1.12.0-foss-2022a-CUDA-11.7.0
+source venv/bin/activate
 
 # -- Download --
 echo "Russian data available here: https://disk.yandex.ru/d/CIU9Hm0tvKPH2g"
@@ -67,13 +69,13 @@ bash "script/clustering/swedish_clustering.sh" "${embeddings_folder}" "${labels_
 bash "script/clustering/spanish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 
 # - LSC measuring --
-bash "script/lsc_measuring/english_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/italian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/russian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/german_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/latin_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/swedish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
-bash "script/lsc_measuring/spanish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/english_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/italian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/russian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/german_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/latin_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/swedish_measuing.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
+bash "script/lsc_measuring/spanish_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}"
 
 # -- Mix datasets --
 bash "script/mix_datasets.sh" "${datasets_folder}" "${embeddings_folder}" "${tokenization_folder}" "${attentions_folder}" "${score_folder}" "${labels_folder}"

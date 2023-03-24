@@ -1,6 +1,6 @@
 #!/bin/sh
 #SBATCH -A NAISS2023-22-226 -p alvis
-#SBATCH -N 1 --gpus-per-node=T4:4 # We're launching 2 nodes with 4 Nvidia T4 GPUs each
+#SBATCH -N 1 --gpus-per-node=A100:4 # We're launching 2 nodes with 4 Nvidia T4 GPUs each
 #SBATCH -t 5:00:00
 
 tokenized_dataset="$1/LSC/DiacrIta-Italian"

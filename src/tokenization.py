@@ -2,6 +2,7 @@ import torch
 import spacy
 import random
 import numpy as np
+from tqdm import tqdm
 from spacy.tokens.doc import Doc
 from abc import ABC, abstractmethod
 from spacy.tokens.token import Token
@@ -71,10 +72,11 @@ class Tokenization(ABC):
         rows = list()
         for idx, row in enumerate(dataset):
             row = row.strip()
+            tokens = row.split()
 
-            for i, token in enumerate(row.split()):
+            for i, token in enumerate(tokens):
                 if self.is_doc_relevant(row, token):
-                    start = len(" ".join(row[:i]))
+                    start = len(" ".join(tokens[:i]))
                     rows.append(dict(sentidx=idx,
                                      lemma=token,
                                      token=token,
@@ -123,10 +125,11 @@ class SpacyTokenization(Tokenization, ABC):
             dataset = self._random_sampling(dataset, sampling)
 
         # spacy tokenization
-        docs = list(self._nlp.pipe(dataset, n_process=-1, batch_size=1000))
+        docs = self._nlp.pipe(dataset, n_process=-1, batch_size=1000)
 
         # collect data
         rows = list()
+        docs = tqdm(docs, total=len(dataset))
         for idx, row in enumerate(docs):
             for token in row:
                 if self.is_doc_relevant(row, token):
@@ -136,7 +139,7 @@ class SpacyTokenization(Tokenization, ABC):
                                      start=token.idx,
                                      end=token.idx + len(token.text),
                                      sent=str(row)))
-
+            docs.update(1)
         return rows
 
 
@@ -216,7 +219,8 @@ if __name__ == '__main__':
          tokenizer = tokenization_class(words)
 
     for corpus in ['corpus1', 'corpus2']:
-        dataset_input = f'{args.dataset}/{corpus}/token/{corpus}.txt'
+        token = 'token' if 'Latin' not in args.dataset and 'Spanish' not in args.dataset else 'lemma'
+        dataset_input = f'{args.dataset}/{corpus}/{token}/{corpus}.txt'
         tokenization_output = f'{args.output}/{corpus}/token'
 
         # run tokenization

@@ -2,7 +2,7 @@ import pickle
 import argparse
 from tqdm import tqdm
 from pathlib import Path
-from src.extraction import AttentionExtraction
+from extraction import AttentionExtraction
 
 parser = argparse.ArgumentParser(prog='Attention extraction',
                                  description='Extract the attention matrices for each sequence containing a target word')

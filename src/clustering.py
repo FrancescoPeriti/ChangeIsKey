@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from sklearn.cluster import AffinityPropagation
-from src.cluster import APosterioriaffinityPropagation
+from cluster import APosterioriaffinityPropagation
 from sklearn.metrics.pairwise import euclidean_distances, cosine_similarity
 
 
@@ -105,15 +105,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Targets
-    words = [word for word in open(args.targets, mode='r', encoding='utf-8').readlines()]
+    words = [word.strip() for word in open(args.targets, mode='r', encoding='utf-8').readlines()]
 
     for word in tqdm(words):
         for l in range(1, args.layers + 1):
-            Path(f'{args.output}/{algo}/corpus1/token/{l}/').mkdir(parents=True, exist_ok=True)
-            Path(f'{args.output}/{algo}/corpus2/token/{l}/').mkdir(parents=True, exist_ok=True)
+            Path(f'{args.output}/{args.algo}/corpus1/token/{l}/').mkdir(parents=True, exist_ok=True)
+            Path(f'{args.output}/{args.algo}/corpus2/token/{l}/').mkdir(parents=True, exist_ok=True)
 
-            c = Clustering(algo=algo)
+            c = Clustering(algo=args.algo)
             c.fit(f'{args.embeddings}/corpus1/token/{l}/{word}.pt',
                   f'{args.embeddings}/corpus2/token/{l}/{word}.pt',
-                  f'{args.output}/{algo}/corpus1/token/{l}/{word}',
-                  f'{args.output}/{algo}/corpus2/token/{l}/{word}')
+                  f'{args.output}/{args.algo}/corpus1/token/{l}/{word}',
+                  f'{args.output}/{args.algo}/corpus2/token/{l}/{word}')

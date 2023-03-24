@@ -1,3 +1,8 @@
+#!/bin/sh
+#SBATCH -A NAISS2023-22-226 -p alvis
+#SBATCH -C NOGPU 
+#SBATCH -t 1-00:00:00
+
 dataset="$1/LSC/SemEval-English"
 model="en_core_web_sm"
 sampling=0

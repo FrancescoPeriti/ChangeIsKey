@@ -2,7 +2,7 @@ import torch
 import argparse
 from tqdm import tqdm
 from pathlib import Path
-from src.extraction import WordEmbeddingExtraction
+from extraction import WordEmbeddingExtraction
 
 parser = argparse.ArgumentParser(prog='Embedding extraction',
                                  description='Extract the embeddeddings for each target word')

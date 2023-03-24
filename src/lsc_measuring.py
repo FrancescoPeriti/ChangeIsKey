@@ -517,7 +517,7 @@ if __name__ == '__main__':
     model=args.model.replace("/", "_")
 
     s = SemanticShiftDetection()
-    for l in t1dm(list(range(1, args.layers+1))):
+    for l in tqdm(list(range(1, args.layers+1))):
         scores=list()
         for word in words:
             # embeddings

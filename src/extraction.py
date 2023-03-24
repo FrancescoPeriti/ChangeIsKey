@@ -4,6 +4,7 @@ import json
 import torch
 import random
 import numpy as np
+import pandas as pd
 from datasets import Dataset, logging as dataset_logging
 from transformers import AutoTokenizer, AutoModel, logging as transformers_logging
 
@@ -72,7 +73,7 @@ class Extraction(abc.ABC):
             dataset
         """
         dataset.shuffle(seed=SEED)
-        return dataset.select(range(0, n))
+        return dataset.select(range(0, min(dataset.num_rows, n)))
         
     def _set_seed_and_device(self) -> object:
         """
@@ -135,6 +136,8 @@ class Extraction(abc.ABC):
                 row = json.loads(line)
                 if row is None: continue
                 rows.append(row)
+
+        #return Dataset.from_pandas(pd.DataFrame(rows))
         return Dataset.from_list(rows)
 
     def _tokenize_dataset(self, dataset: Dataset, max_length: int) -> Dataset:
@@ -197,7 +200,7 @@ class WordEmbeddingExtraction(Extraction):
         if sampling:
             dataset = self._random_sampling(dataset, sampling)
         
-        text = dataset.select_columns('sent')
+        text = dataset.select_columns('sent') #Dataset.from_dict({'sent': dataset['sent']})
         offset = dataset.remove_columns('sent')
         
         # tokenize text
@@ -303,9 +306,10 @@ class AttentionExtraction(Extraction):
 
             for i, attn in enumerate(attns):
                 # remove attention to pad tokens
-                special_tokens = torch.tensor([self.tokenizer.pad_token_id]).to(self._device)
-                idx = torch.arange(0, max_length).to(self._device)
-                filter_idx = idx[~torch.isin(input_ids[i], special_tokens)]
+                special_tokens = torch.tensor([self.tokenizer.pad_token_id]).to(self._device)                
+                filter_idx = [i for i, idx in enumerate(input_ids[i]) if idx not in special_tokens]
+                #idx = torch.arange(0, max_length).to(self._device)
+                #filter_idx = idx[~torch.isin(input_ids[i], special_tokens)]
                 attn = attn[:, :, filter_idx, :]
                 attn = attn[:, :, :, filter_idx]
                 attentions.append(attn.to('cpu'))

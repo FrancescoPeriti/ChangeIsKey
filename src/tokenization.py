@@ -124,8 +124,8 @@ class SpacyTokenization(Tokenization, ABC):
         if sampling:
             dataset = self._random_sampling(dataset, sampling)
 
-        # spacy tokenization
-        docs = self._nlp.pipe(dataset, n_process=-1, batch_size=1000)
+        # spacy tokenization (n_process=-1, batch_size=10000)
+        docs = self._nlp.pipe(dataset, n_process=8, batch_size=32)
 
         # collect data
         rows = list()

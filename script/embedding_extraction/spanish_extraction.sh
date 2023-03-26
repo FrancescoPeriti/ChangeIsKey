@@ -12,7 +12,7 @@ sampling=250
 targets="$3/LSC/LSCDiscovery-Spanish/targets.txt"
 agg_sub_words='mean'
 
-declare -a models=("bert-base-multilingual-cased" "dccuchile/bert-base-spanish-wwm-cased")
+declare -a models=("bert-base-multilingual-cased" "dccuchile/bert-base-spanish-wwm-uncased" "dccuchile/bert-base-spanish-wwm-cased")
 
 for model in "${models[@]}"
 do

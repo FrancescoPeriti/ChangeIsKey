@@ -33,10 +33,10 @@ source venv/bin/activate
 # -- Tokenization --
 #sbatch "script/tokenization/english_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
 #sbatch "script/tokenization/german_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
-sbatch "script/tokenization/italian_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
+#bash "script/tokenization/italian_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
 #bash "script/tokenization/latin_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
 #sbatch "script/tokenization/swedish_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
-sbatch "script/tokenization/spanish_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
+#sbatch "script/tokenization/spanish_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
 
 # -- Embeddings extraction --
 #sbatch "script/embedding_extraction/english_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
@@ -51,7 +51,7 @@ sbatch "script/tokenization/spanish_tokenization.sh" "${datasets_folder}" "${tok
 #sbatch "script/attention_extraction/english_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/german_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/italian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
-#sbatch "script/attention_extraction/latin_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+sbatch "script/attention_extraction/latin_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/swedish_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/spanish_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/russian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
@@ -62,7 +62,7 @@ sbatch "script/tokenization/spanish_tokenization.sh" "${datasets_folder}" "${tok
 # -- Clustering --
 #sbatch "script/clustering/english_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #bash "script/clustering/italian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
-#bash "script/clustering/russian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
+#sbatch "script/clustering/russian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #sbatch "script/clustering/german_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #sbatch "script/clustering/latin_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #sbatch "script/clustering/swedish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"

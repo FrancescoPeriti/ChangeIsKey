@@ -343,7 +343,7 @@ class BruteForce:
 
         # -- Distance matrix between embeddings --
         proto_dist = prototype_distance_matrix(PE1, PE2)
-
+        
         new_measures = dict()
 
         # Prototype Hausdorff Distance
@@ -354,11 +354,12 @@ class BruteForce:
 
         # Condition Number
         new_measures['Cond'] = lsc_measuring(proto_dist, None, lambda x: np.linalg.cond(x, 'fro'))
-
+        
         # ERank
         new_measures['Erank'] = lsc_measuring(proto_dist, None,
                                               lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))
 
+        
         # Average of PRT over different layers
         new_measures['AvgPRT'] = lsc_measuring(proto_dist, None, lambda x: np.diag(x).mean())
 
@@ -408,6 +409,8 @@ class BruteForce:
             tmp[comb_name] = gmean([tmp[m] for m in comb], axis=0)
             comb_name = 'mean ' + '-'.join(comb)
             tmp[comb_name] = np.mean([tmp[m] for m in comb], axis=0)
+            comb_name = 'sum ' + '-'.join(comb)
+            tmp[comb_name] = np.sum([tmp[m] for m in comb], axis=0)
 
         # mask
         mask_changed = [i for i, k in enumerate(binary) if k]
@@ -451,8 +454,41 @@ class BruteForce:
         return res
 
     def validation(self, res:list, topn:int=100,
-                   n_combinations: int = 1000, percent: int = 40):
-
+                   n_combinations: int = 1000, percent: int = 40, sort_by:list=['changed_corr', 'acc']):
+        """
+        Args:
+            res(list): scores results
+            topn(int, default=100): validate only the top n combinations
+            n_combinations(int, default=1000): number of combinations/permutations for cross validation and permutation test
+            percent(int, default=40): percentage of words to keep in the test sets
+            sort_by(list, default=['corr', 'acc']): consider the top n combination sorted by 'sort_by' values
+        
+        Returns:
+            a list of dictionaries containing the evaluation results for each combination and aggregation method.
+            Each dictionary contains the following keys:
+            - idx (str): the combination idx.
+            - agg (str): the aggregation method used for the combination of .
+            - corr (float): the Spearman correlation between the predicted and true scores.
+            - pvalue (float): the p-value associated with the Spearman correlation.
+            - acc (float): the accuracy of the predicted labels.
+            - thr (float): the threshold used to generate the predicted labels.
+            - auc_roc (float): the area under the ROC curve for the predicted labels.
+            - auc_pr (float): the area under the precision-recall curve for the predicted labels.
+            - changed_corr (float): the Spearman correlation between the predicted and true scores for the changed words only.
+            - changed_pvalue (float): the p-value associated with the Spearman correlation for the changed words only.
+            - stable_corr (float): the Spearman correlation between the predicted and true scores for the stable words only.
+            - stable_pvalue (float): the p-value associated with the Spearman correlation for the stable words only.
+            - score (np.array): predicted scores with the idx combination
+            - pt_pvalue (float): pvalue of permutation test computed over the set of target words
+            - stable_pt_pvalue (float): pvalue of permutation test computed over the set of stable words
+            - changed_pt_pvalue (float): pvalue of permutation test computed over the set of changed words
+            - changed_corr_test (float): average correlation obtained over the test set of changed words through cross-validation
+            - changed_corr_train (float): average correlation obtained over the train set of changed words through cross-validation
+            - changed_pvalue_test (float): average pvalue obtained over the test set of changed words through cross-validation
+            - changed_pvalue_train (float): average pvalue obtained over the train set of changed words through cross-validation
+        """
+        
+        
         set_seed(SEED)
         binary = self.dh.load_binary(self.dataset, self.name).score.values
         graded = self.dh.load_graded(self.dataset, self.name).score.values
@@ -462,10 +498,10 @@ class BruteForce:
         if 'Russian' not in self.dataset:
             ascending=False
         else:
-            ascending=True
+            ascending=[True, False]
 
         res = pd.DataFrame(res)
-        res = res.sort_values('corr', ascending=ascending).reset_index(drop=True).head(topn)
+        res = res.sort_values(sort_by, ascending=ascending).reset_index(drop=True).head(topn)
 
         # -- Train and test sets --
         n_changed_words = binary[mask_changed].shape[0]
@@ -544,9 +580,13 @@ if __name__ == '__main__':
     #res.to_csv(f'{out_folder}/bf_mix_embeddings.txt', index=False, sep='\t')
 
     res = b.evaluate_mix_measure(args.depth, standardize=False)
-    res = b.validation(res)
-    res.to_csv(f'{out_folder}/bf_mix_measures.txt', index=False, sep='\t')
-
+    res_corr = b.validation(res, sort_by=['corr', 'acc'])
+    res_corr.to_csv(f'{out_folder}/bf_mix_measures_corr.txt', index=False, sep='\t')
+    res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
+    res_changed_corr.to_csv(f'{out_folder}/bf_mix_measures_changed_corr.txt', index=False, sep='\t')
+    
     res = b.evaluate_mix_measure(args.depth, standardize=True)
-    res = b.validation(res)
-    res.to_csv(f'{out_folder}/bf_mix_std_measures.txt', index=False, sep='\t')
+    res_corr = b.validation(res, sort_by=['corr', 'acc'])
+    res_corr.to_csv(f'{out_folder}/bf_mix_std_measures_corr.txt', index=False, sep='\t')
+    res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
+    res_changed_corr.to_csv(f'{out_folder}/bf_mix_std_measures_changed_corr.txt', index=False, sep='\t')

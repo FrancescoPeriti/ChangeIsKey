@@ -81,7 +81,7 @@ class Tokenization(ABC):
                                      lemma=token,
                                      token=token,
                                      start=start,
-                                     end=start + len(token),
+                                     end=start + len(token) + 1,
                                      sent=row))
 
         return rows
@@ -220,6 +220,7 @@ if __name__ == '__main__':
 
     for corpus in ['corpus1', 'corpus2']:
         token = 'token' if 'Latin' not in args.dataset and 'Spanish' not in args.dataset else 'lemma'
+        #token = 'token' if 'Spanish' not in args.dataset else 'lemma'
         dataset_input = f'{args.dataset}/{corpus}/{token}/{corpus}.txt'
         tokenization_output = f'{args.output}/{corpus}/token'
 

@@ -54,11 +54,11 @@ for corpus in ['corpus1', 'corpus2']:
         embeddings_output = f'{args.output}/{args.model.replace("/", "_")}/{corpus}/token'
 
         # extraction
-        embddings = w.extract(dataset=tokenization_input, batch_size=args.batch_size,
+        embeddings = w.extract(dataset=tokenization_input, batch_size=args.batch_size,
                               max_length=args.max_length, agg_sub_words='mean',
                               layers=args.layers, sampling=args.sampling)
 
         # store embeddings
         for l in range(1, args.layers + 1):
             Path(f'{embeddings_output}/{l}/').mkdir(parents=True, exist_ok=True)
-            torch.save(embddings[l].to('cpu'), f'{embeddings_output}/{l}/{word}.pt')
+            torch.save(embeddings[l].to('cpu'), f'{embeddings_output}/{l}/{word}.pt')

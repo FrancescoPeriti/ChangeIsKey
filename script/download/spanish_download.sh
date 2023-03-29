@@ -61,13 +61,13 @@ cp targets_development.txt targets.txt
 cut -f1 "${targets_test}" | tail -n+2 >> targets.txt
 mkdir truth
 cut -f1,12 "${targets_test}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/binary_test.txt"
-cut -f1,13 "${targets_test}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/graded_test.txt"
+cut -f1,15 "${targets_test}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/graded_test.txt"
 cut -f1,12 "${targets_development}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/binary_development.txt"
-cut -f1,13 "${targets_development}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/graded_development.txt"
+cut -f1,15 "${targets_development}" | tail -n+2 > "${dataset_folder}/${spanish}/truth/graded_development.txt"
 cp "${dataset_folder}/${spanish}/truth/binary_development.txt" "${dataset_folder}/${spanish}/truth/binary.txt"
 cp "${dataset_folder}/${spanish}/truth/graded_development.txt" "${dataset_folder}/${spanish}/truth/graded.txt"
 cut -f1,12 "${targets_test}" | tail -n+2 >> "${dataset_folder}/${spanish}/truth/binary.txt"
-cut -f1,13 "${targets_test}" | tail -n+2 >> "${dataset_folder}/${spanish}/truth/graded.txt"
+cut -f1,15 "${targets_test}" | tail -n+2 >> "${dataset_folder}/${spanish}/truth/graded.txt"
 rm -rf "${dataset_folder}/${spanish}/dwug_es_development/"
 rm -rf "${dataset_folder}/${spanish}/dwug_es_test/"
 cd "${current_folder}"

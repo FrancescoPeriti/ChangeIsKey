@@ -308,10 +308,17 @@ class AttentionExtraction(Extraction):
                 # remove attention to pad tokens
                 special_tokens = torch.tensor([self.tokenizer.pad_token_id]).to(self._device)                
                 filter_idx = [i for i, idx in enumerate(input_ids[i]) if idx not in special_tokens]
+
+                # Let's mark attention of pad tokens with -1 
+                #attn[:, :, filter_idx, :] = -1
+                #attn[:, :, :, filter_idx] = -1
+                
+
                 #idx = torch.arange(0, max_length).to(self._device)
                 #filter_idx = idx[~torch.isin(input_ids[i], special_tokens)]
                 attn = attn[:, :, filter_idx, :]
                 attn = attn[:, :, :, filter_idx]
+
                 attentions.append(attn.to('cpu'))
 
         return attentions

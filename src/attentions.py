@@ -1,4 +1,5 @@
 import pickle
+import torch
 import argparse
 from tqdm import tqdm
 from pathlib import Path
@@ -57,5 +58,6 @@ for corpus in ['corpus1', 'corpus2']:
             Path(f'{attentions_output}/{l}/').mkdir(parents=True, exist_ok=True)
             attn_l = [a[l-1] for a in attentions]
 
+            #torch.save(torch.stack(attn_l).to('cpu'), f'{attentions_output}/{l}/{word}.pt')
             with open(f'{attentions_output}/{l}/{word}.pickle', 'wb') as f:
                 pickle.dump(attn_l, f, protocol=pickle.HIGHEST_PROTOCOL)

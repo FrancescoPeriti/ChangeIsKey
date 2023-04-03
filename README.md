@@ -74,9 +74,9 @@ source venv/bin/activate
 # - LSC measuring --
 ##sbatch "script/lsc_measuring/english_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/italian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
-#sbatch "script/lsc_measuring/russian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
+#bash "script/lsc_measuring/russian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/german_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
-##bash "script/lsc_measuring/latin_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
+#sbatch "script/lsc_measuring/latin_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/swedish_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/spanish_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 
@@ -87,9 +87,9 @@ source venv/bin/activate
 sbatch "script/brute_force/english_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
 sbatch "script/brute_force/spanish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
 sbatch "script/brute_force/german_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-#sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
+sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
 sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-#sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
+sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
 
 # -- Attn scores --
 #sbatch "script/attn_lsc_measuring/english_attn_measuring.sh" "${attentions_folder}" "${datasets_folder}" "${tokenization_folder}" "${attn_score_folder}"

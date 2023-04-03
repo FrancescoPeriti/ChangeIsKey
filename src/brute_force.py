@@ -123,7 +123,7 @@ def lsc_measuring(E1: torch.tensor, E2: torch.tensor, metric: object) -> np.arra
         return np.array([metric(E1[word]) for word in E1.keys()])
 
 
-def cross_validation(y: np.array, y_true: np.array, train_sets: list, test_sets: list, graded: bool = True) -> tuple:
+def cross_validation(y: np.array, y_true: np.array, train_sets: list, test_sets: list, graded: bool = True, graded_stable:np.array=None, binary_true=None, graded_true=None) -> tuple:
     """
     Computes cross-validation statistics for a prediction task.
 
@@ -143,13 +143,24 @@ def cross_validation(y: np.array, y_true: np.array, train_sets: list, test_sets:
         - 'info' is the average corresponding classification threshold
     """
 
+    mask_changed = [i for i, k in enumerate(binary_true) if k]#
+    mask_stable = [i for i, k in enumerate(binary_true) if not k]#
+    graded_stable_true = graded_true[mask_stable]#
+    graded_changed_true = graded_true[mask_changed]#
+    binary_stable_true = np.array([0]*graded_stable.shape[0])#
+    
+    
     if graded:
         metric = spearman
     else:
         metric = accuracy
 
+    res=dict()
     score_test, info_test = list(), list()
     score_train, info_train = list(), list()
+    corrs, pvalues = list(), list()#
+    accs, thrs = list(), list()#
+    auc_rocs, auc_prs =list(), list()#
     for i in range(0, len(train_sets)):
 
         # -- Test set --
@@ -162,10 +173,53 @@ def cross_validation(y: np.array, y_true: np.array, train_sets: list, test_sets:
         score_train.append(score)
         info_train.append(info)
 
+        
+        ###    
+        # full evaluation
+        y_preds = np.concatenate([graded_stable, y[test_sets[i]]])
+        binary = np.concatenate([binary_stable_true, [1]*y[test_sets[i]].shape[0]])
+        
+        corr, pvalue = spearman(y_preds, np.concatenate([graded_stable_true, graded_changed_true[test_sets[i]]]))
+        corrs.append(corr)
+        pvalues.append(pvalue)
+
+        try:
+            acc, thr = accuracy(y_preds, binary)
+            labels = np.array([1 if i >= thr else 0 for i in y_preds])
+            auc_roc = roc_auc_score(labels, binary)
+            precision, recall, thresholds = precision_recall_curve(labels, binary)
+            auc_pr = auc_score(recall, precision)
+        except:
+            acc, thr, auc_roc, auc_pr = 0,0,0,0
+        accs.append(acc)
+        thrs.append(thr)
+
+            
+
+        auc_rocs.append(auc_roc)
+
+
+        auc_prs.append(auc_pr)
+        ###########
+        
+    res['cv_score_train'] = score_train
+    res['cv_score_test'] = score_test
+    res['cv_pvalue_train'] = info_train
+    res['cv_pvalue_test'] = info_test
+    res['cv_corr'] = corrs
+    res['cv_pvalue']=pvalues
+    res['cv_acc']=accs
+    res['cv_thr']=thrs
+    res['cv_auc_roc']=auc_rocs
+    res['cv_auc_pr']=auc_prs
+    
     score_train, info_train = np.array(score_train).mean(), np.array(info_train).mean()
     score_test, info_test = np.array(score_test).mean(), np.array(info_test).mean()
+    
 
-    return score_train, info_train, score_test, info_test
+
+    return res
+    #return score_train, info_train, score_test, info_test
 
 
 def permutation_test(y:np.array, y_true:np.array, n_resamples:int=1000) -> float:
@@ -216,7 +270,7 @@ class BruteForce:
         self.name = name
         self.layers = layers
 
-    def evaluate_mix_embeddings(self, depth: int = 3) -> list:
+    def evaluate_mix_embeddings(self, depth: int = 4) -> list:
         """
         Evaluate the performance of mixed embeddings (extracted from different layers)
         with different combinations and aggregation methods.
@@ -365,7 +419,7 @@ class BruteForce:
 
         set_seed(SEED)
         for layer in range(1, self.layers + 1):
-            y = self.dh.load_scores(self.dataset, self.model, layer)
+            y = self.dh.load_scores(self.dataset, self.model if 'Russian' not in self.dataset else self.model+'_40', layer)
 
             # old measures
             new_measures[f'APD{layer}'] = y[y['measure'] == 'apd_cosine'].score.values
@@ -419,7 +473,7 @@ class BruteForce:
         # results
         res = list()
         for comb_name in tqdm(list(tmp.keys()), desc='Combining measures'):
-            if comb_name in ['word', 'score']: continue
+            if comb_name in ['word', 'score', 'change']: continue
 
             # get aggregation
             agg = comb_name.split()[0]
@@ -437,8 +491,11 @@ class BruteForce:
                 precision, recall, thresholds = precision_recall_curve(labels, binary)
                 auc_pr = auc_score(recall, precision)
             except:
+                if pvalue != pvalue:
+                    corr, pvalue = 0,0
+                acc, thr, auc_roc, auc_pr = 0,0,0,0
                 # something wrong with nan values
-                continue
+                #continue
 
             # changed evaluation
             changed_corr, changed_pvalue = spearman(y[mask_changed], graded[mask_changed])
@@ -453,8 +510,8 @@ class BruteForce:
 
         return res
 
-    def validation(self, res:list, topn:int=100,
-                   n_combinations: int = 1000, percent: int = 40, sort_by:list=['changed_corr', 'acc']):
+    def validation(self, res:list, topn:int=None,#TODO:100
+                   n_combinations: int = 100, percent: int = 40, sort_by:list=['changed_corr', 'acc']):
         """
         Args:
             res(list): scores results
@@ -501,40 +558,54 @@ class BruteForce:
             ascending=[True, False]
 
         res = pd.DataFrame(res)
-        res = res.sort_values(sort_by, ascending=ascending).reset_index(drop=True).head(topn)
+        res = res.sort_values(sort_by, ascending=ascending).reset_index(drop=True).head(topn if topn is not None else res.shape[0])
 
         # -- Train and test sets --
         n_changed_words = binary[mask_changed].shape[0]
         n_changed_words_per_test_set = int(n_changed_words * percent / 100)
-        
-        changed_test_sets = [list(i) for i in
-                             islice(combinations(list(range(0, n_changed_words)), n_changed_words_per_test_set),
-                                    n_combinations)]
-        changed_train_sets = [[i for i in range(0, n_changed_words) if i not in t] for t in changed_test_sets]
+
+        tmp = list(range(0, n_changed_words))
+        changed_test_sets, changed_train_sets = list(), list()
+        for i in range(n_combinations):
+            random.shuffle(tmp)
+            changed_test_sets.append(tmp[:n_changed_words_per_test_set])
+            changed_train_sets.append(tmp[n_changed_words_per_test_set:])
+
+        #changed_test_sets = [list(i) for i in combinations(list(range(0, n_changed_words)), n_changed_words_per_test_set)]
+        #random.shuffle(changed_test_sets)
+        #changed_test_sets = changed_test_sets[:n_combinations]
+        #changed_train_sets = [[i for i in range(0, n_changed_words) if i not in t] for t in changed_test_sets]
 
         
         # results
         new_res = dict(pt_pvalue=list(), stable_pt_pvalue=list(), changed_pt_pvalue=list(),
                        changed_corr_test=list(), changed_corr_train=list(),
                        changed_pvalue_test=list(), changed_pvalue_train=list())
-        for i, row in tqdm(res.iterrows(), total=topn):
+        new_res = dict(cv_score_train=list(), cv_score_test=list(), cv_pvalue_train=list(), cv_pvalue_test=list(), cv_corr=list(),
+                       cv_pvalue=list(), cv_acc=list(), cv_thr=list(), cv_auc_roc=list(), cv_auc_pr=list())
+
+        
+        for i, row in tqdm(res.iterrows(), total=topn if topn is not None else res.shape[0]):
             # permutation test
-            pt_pvalue = permutation_test(row['score'], graded)
-            changed_pt_pvalue = permutation_test(row['score'][mask_changed], graded[mask_changed])
-            stable_pt_pvalue = permutation_test(row['score'][mask_stable], graded[mask_stable])
+            #TODO:pt_pvalue = permutation_test(row['score'], graded)
+            #TODO:changed_pt_pvalue = permutation_test(row['score'][mask_changed], graded[mask_changed])
+            #TODO:stable_pt_pvalue = permutation_test(row['score'][mask_stable], graded[mask_stable])
 
             # cross validation test
-            changed_corr_train, changed_pvalue_train, changed_corr_test, changed_pvalue_test = cross_validation(
-                row['score'][mask_changed], graded[mask_changed], changed_train_sets, changed_test_sets)
+            #changed_corr_train, changed_pvalue_train, changed_corr_test, changed_pvalue_test =
+            tmp=cross_validation(
+                row['score'][mask_changed], graded[mask_changed], changed_train_sets, changed_test_sets, graded_stable=row['score'][mask_stable], binary_true=binary, graded_true=graded)#TODO:last arg
 
-            new_res['pt_pvalue'].append(pt_pvalue)
-            new_res['stable_pt_pvalue'].append(stable_pt_pvalue)
-            new_res['changed_pt_pvalue'].append(changed_pt_pvalue)
-            new_res['changed_corr_test'].append(changed_corr_test)
-            new_res['changed_corr_train'].append(changed_corr_train)
-            new_res['changed_pvalue_test'].append(changed_pvalue_test)
-            new_res['changed_pvalue_train'].append(changed_pvalue_train)
-
+            #TODO:new_res['pt_pvalue'].append(pt_pvalue)
+            #TODO:new_res['stable_pt_pvalue'].append(stable_pt_pvalue)
+            #TODO:new_res['changed_pt_pvalue'].append(changed_pt_pvalue)
+            #TODO:new_res['changed_corr_test'].append(changed_corr_test)
+            #TODO:new_res['changed_corr_train'].append(changed_corr_train)
+            #TODO:new_res['changed_pvalue_test'].append(changed_pvalue_test)
+            #TODO:new_res['changed_pvalue_train'].append(changed_pvalue_train)
+            for k in tmp:
+                new_res[k].append(tmp[k])
+                
         for k in new_res:
             res[k] = new_res[k]
 
@@ -572,8 +643,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     b = BruteForce(args.main_folder, args.dataset, args.model, args.layers, args.name)
-    #res = b.evaluate_mix_embeddings(args.depth)
-    #res = b.validation(res)
+    #res = b.evaluate_mix_embeddings(args.depth+1)
+    #res = b.validation(res, sort_by=['corr', 'acc'])
 
     out_folder = f'{args.output_folder}/LSC/{args.dataset}/{args.model}'
     Path(out_folder).mkdir(parents=True, exist_ok=True)
@@ -582,11 +653,11 @@ if __name__ == '__main__':
     res = b.evaluate_mix_measure(args.depth, standardize=False)
     res_corr = b.validation(res, sort_by=['corr', 'acc'])
     res_corr.to_csv(f'{out_folder}/bf_mix_measures_corr.txt', index=False, sep='\t')
-    res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
-    res_changed_corr.to_csv(f'{out_folder}/bf_mix_measures_changed_corr.txt', index=False, sep='\t')
+    #res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
+    #res_changed_corr.to_csv(f'{out_folder}/bf_mix_measures_changed_corr.txt', index=False, sep='\t')
     
     res = b.evaluate_mix_measure(args.depth, standardize=True)
     res_corr = b.validation(res, sort_by=['corr', 'acc'])
     res_corr.to_csv(f'{out_folder}/bf_mix_std_measures_corr.txt', index=False, sep='\t')
-    res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
-    res_changed_corr.to_csv(f'{out_folder}/bf_mix_std_measures_changed_corr.txt', index=False, sep='\t')
+    #res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
+    #res_changed_corr.to_csv(f'{out_folder}/bf_mix_std_measures_changed_corr.txt', index=False, sep='\t')

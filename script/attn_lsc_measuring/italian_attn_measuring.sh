@@ -7,6 +7,7 @@ attention_folder="$1/LSC/DiacrIta-Italian"
 dataset_folder="$2/LSC/DiacrIta-Italian"
 tokenization_folder="$3/LSC/DiacrIta-Italian"
 attn_score_folder="$4/LSC/DiacrIta-Italian"
+sampling=0
 
 layers=12
 
@@ -14,5 +15,5 @@ declare -a models=("bert-base-multilingual-cased" "dbmdz/bert-base-italian-uncas
 
 for model in "${models[@]}"
 do
-    python src/attn_lsc_measuring.py -a "${attention_folder}" -m "${model}" -o "${attn_score_folder}" -T "${tokenization_folder}" -t "${dataset_folder}/targets.txt" -l  "${layers}"
+    python src/attn_lsc_measuring.py -a "${attention_folder}" -m "${model}" -o "${attn_score_folder}" -T "${tokenization_folder}" -t "${dataset_folder}/targets.txt" -l  "${layers}" -s "${sampling}"
 done

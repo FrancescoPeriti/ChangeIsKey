@@ -7,6 +7,7 @@ attention_folder="$1/LSC/SemEval-German"
 dataset_folder="$2/LSC/SemEval-German"
 tokenization_folder="$3/LSC/SemEval-German"
 attn_score_folder="$4/LSC/SemEval-German"
+sampling=250
 
 layers=12
 
@@ -14,5 +15,5 @@ declare -a models=("bert-base-german-cased" "bert-base-multilingual-cased")
 
 for model in "${models[@]}"
 do
-    python src/attn_lsc_measuring.py -a "${attention_folder}" -m "${model}" -o "${attn_score_folder}" -T "${tokenization_folder}" -t "${dataset_folder}/targets.txt" -l  "${layers}"
+    python src/attn_lsc_measuring.py -a "${attention_folder}" -m "${model}" -o "${attn_score_folder}" -T "${tokenization_folder}" -t "${dataset_folder}/targets.txt" -l  "${layers}" -s "${sampling}"
 done

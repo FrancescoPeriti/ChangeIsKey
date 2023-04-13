@@ -4,13 +4,20 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy import stats
+from sklearn.metrics import f1_score
+from itertools import combinations
+from collections import defaultdict
 from data_handler import DataHandler
-from itertools import combinations, islice
 from sklearn.decomposition import PCA
 from scipy.spatial.distance import cdist
+from sklearn.linear_model import LinearRegression
 from scipy.stats import gmean, entropy, spearmanr
 from scipy.spatial.distance import directed_hausdorff
 from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve, precision_recall_curve, auc as auc_score
+
+import warnings
+
+warnings.filterwarnings("ignore")
 
 SEED = 42
 
@@ -32,7 +39,7 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def accuracy(y: np.array, y_true: np.array) -> tuple:
+def accuracy(y_true: np.array, y: np.array) -> tuple:
     """
     Calculates the accuracy score for a binary classification problem.
     The function first calculates the False Positive Rate (FPR), True Positive Rate (TPR), and Thresholds using the
@@ -45,6 +52,7 @@ def accuracy(y: np.array, y_true: np.array) -> tuple:
     Returns:
         acc, thr
     """
+    
     # False Positive Rate - True Positive Rate
     fpr, tpr, thresholds = roc_curve(y_true, y)
 
@@ -123,106 +131,7 @@ def lsc_measuring(E1: torch.tensor, E2: torch.tensor, metric: object) -> np.arra
         return np.array([metric(E1[word]) for word in E1.keys()])
 
 
-def cross_validation(y: np.array, y_true: np.array, train_sets: list, test_sets: list, graded: bool = True, graded_stable:np.array=None, binary_true=None, graded_true=None) -> tuple:
-    """
-    Computes cross-validation statistics for a prediction task.
-
-    Args:
-        y(np.array): The predicted values for each sample.
-        y_true(np.array): The true values for each sample.
-        train_sets(list): A list of indices defining the samples in each training set.
-        test_sets(list): A list of indices defining the samples in each test set.
-        graded(bool, default=True): If True, computes graded statistics (Spearman correlation and p-value) for each fold. If False, computes binary statistics (accuracy and threshold) for each fold.
-    Returns:
-        score_train, info_train, score_test, info_test
-        When graded is true:
-         - 'score' is the average Spearman correlation coefficient between the predicted and true values for the test sets.
-         - 'info' is the average corresponding pvalue
-        When graded is False:
-        - 'score' is the average accuracy between the predicted and true values for the test sets.
-        - 'info' is the average corresponding classification threshold
-    """
-
-    mask_changed = [i for i, k in enumerate(binary_true) if k]#
-    mask_stable = [i for i, k in enumerate(binary_true) if not k]#
-    graded_stable_true = graded_true[mask_stable]#
-    graded_changed_true = graded_true[mask_changed]#
-    binary_stable_true = np.array([0]*graded_stable.shape[0])#
-    
-    
-    if graded:
-        metric = spearman
-    else:
-        metric = accuracy
-
-    res=dict()
-    score_test, info_test = list(), list()
-    score_train, info_train = list(), list()
-    corrs, pvalues = list(), list()#
-    accs, thrs = list(), list()#
-    auc_rocs, auc_prs =list(), list()#
-    for i in range(0, len(train_sets)):
-
-        # -- Test set --
-        score, info = metric(y[test_sets[i]], y_true[test_sets[i]])
-        score_test.append(score)
-        info_test.append(info)
-
-        # -- Train set --
-        score, info = metric(y[train_sets[i]], y_true[train_sets[i]])
-        score_train.append(score)
-        info_train.append(info)
-
-        
-        ###    
-        # full evaluation
-        y_preds = np.concatenate([graded_stable, y[test_sets[i]]])
-        binary = np.concatenate([binary_stable_true, [1]*y[test_sets[i]].shape[0]])
-        
-        corr, pvalue = spearman(y_preds, np.concatenate([graded_stable_true, graded_changed_true[test_sets[i]]]))
-        corrs.append(corr)
-        pvalues.append(pvalue)
-
-        try:
-            acc, thr = accuracy(y_preds, binary)
-            labels = np.array([1 if i >= thr else 0 for i in y_preds])
-            auc_roc = roc_auc_score(labels, binary)
-            precision, recall, thresholds = precision_recall_curve(labels, binary)
-            auc_pr = auc_score(recall, precision)
-        except:
-            acc, thr, auc_roc, auc_pr = 0,0,0,0
-        accs.append(acc)
-        thrs.append(thr)
-
-            
-
-        auc_rocs.append(auc_roc)
-
-
-        auc_prs.append(auc_pr)
-        ###########
-        
-    res['cv_score_train'] = score_train
-    res['cv_score_test'] = score_test
-    res['cv_pvalue_train'] = info_train
-    res['cv_pvalue_test'] = info_test
-    res['cv_corr'] = corrs
-    res['cv_pvalue']=pvalues
-    res['cv_acc']=accs
-    res['cv_thr']=thrs
-    res['cv_auc_roc']=auc_rocs
-    res['cv_auc_pr']=auc_prs
-    
-    score_train, info_train = np.array(score_train).mean(), np.array(info_train).mean()
-    score_test, info_test = np.array(score_test).mean(), np.array(info_test).mean()
-    
-
-
-    return res
-    #return score_train, info_train, score_test, info_test
-
-
-def permutation_test(y:np.array, y_true:np.array, n_resamples:int=1000) -> float:
+def permutation_test(y_true: np.array, y: np.array, n_resamples: int = 1000) -> float:
     """
     Perform a permutation test to assess the significance of the Spearman correlation coefficient between `y` and `y_true`.
 
@@ -263,14 +172,422 @@ def prototype_distance_matrix(E1: dict, E2: dict) -> dict:
 
 
 class BruteForce:
-    def __init__(self, data_folder: str, dataset: str, model: str, layers: int = 12, name: str = None):
+    def __init__(self, data_folder: str, dataset: str, model: str, layers: int = 12,
+                 ignore_n_stable: int = 0, n_combinations: int = 100, percent: int = 40):
+        """
+        Args:
+            data_folder(str): main folder containing the data of the project
+            dataset(str): name of the dataset under consideration
+            model(str): name of the bert-like model used
+            layers(int, default=12): number of layers of the model
+            ignore_n_stable(int, default=0): remove n stable words larger than the smallest changed words
+            n_combinations(int, default=100): number of split for cross validation
+            percent(int, default=40): percent of changed word for each split
+        """
+
         self.dh = DataHandler(data_folder)
         self.dataset = dataset
         self.model = model
-        self.name = name
+        self.name = None
         self.layers = layers
+        self.ignore_n_stable = ignore_n_stable
+        self.gt = self._load_ground_truth()
 
-    def evaluate_mix_embeddings(self, depth: int = 4) -> list:
+        self.changed_train_sets, self.changed_test_sets = self._set_split(binary=self.gt['binary'],
+                                                                         mask=self.gt['mask_changed'],
+                                                                         n_combinations=n_combinations, percent=percent)
+
+    def _load_ground_truth(self) -> dict:
+        """
+        Load in memory ground truth scores, targets, and masks to access stable/changed words
+        """
+
+        # -- Load ground truth --
+        binary = self.dh.load_binary(self.dataset, self.name).score.values
+        graded = self.dh.load_graded(self.dataset, self.name).score.values
+        targets = self.dh.load_targets(self.dataset, self.name).word.values
+
+        # -- Remove the n stable words that changed most than changed words --
+        targets, graded, binary, mask_stable, mask_changed, mask = self._ignore_stable_words(targets, graded, binary)
+
+        return dict(targets=targets, graded=graded, binary=binary,
+                    mask_stable=mask_stable, mask_changed=mask_changed, mask=mask)
+
+    def _set_split(self, binary:np.array, mask:np.array, n_combinations: int = 100, percent: int = 40) -> tuple:
+        """
+        Args:
+            binary(np.array): binary scores for target words
+            mask(np.array): mask of changed/stable words to consider
+            n_combinations(int, default=100): number of split for cross validation
+            percent(int, default=40): percent of changed/stable word for each split
+        Returns:
+            train and test sets
+        """
+        set_seed(SEED)
+
+        # -- Train and test sets --
+        n_words = binary[mask].shape[0]
+        n_words_per_test_set = int(n_words * percent / 100)
+
+        idx_words = list(range(0, n_words))
+        test_sets, train_sets = list(), list()
+        for i in range(n_combinations):
+            random.shuffle(idx_words)
+            test_sets.append(idx_words[:n_words_per_test_set])
+            train_sets.append(idx_words[n_words_per_test_set:])
+
+        return train_sets, test_sets
+
+    def _ignore_stable_words(self, targets: np.array, graded: np.array, binary: np.array) -> tuple:
+        """Remove remove n stable words larger than the smallest changed words
+
+        Args:
+            targets(np.array): target words
+            graded(np.array): graded score for each word
+            binary(np.array): binary score for each word
+
+        Returns:
+            targets, graded, binary, mask_stable, mask_changed
+        """
+
+        # -- Indexes for changed and stable words --
+        mask_changed = [i for i, k in enumerate(binary) if k]
+        mask_stable = [i for i, k in enumerate(binary) if not k]
+
+        if self.ignore_n_stable == 0:
+            return targets, graded, binary, mask_stable, mask_changed, list(range(0, binary.shape[0]))
+        
+        # Min changed word
+        min_changed = graded[mask_changed].min()
+
+        # Top-graded stable words
+        idx_max_stable = np.argpartition(graded[mask_stable], -self.ignore_n_stable)[-self.ignore_n_stable:]
+
+        # Misleading values to ignore
+        values_to_ignore = [graded[mask_stable][i] for i in idx_max_stable if graded[mask_stable][i] >= min_changed]
+
+        # -- Mask --
+        mask_stable = [i for i in mask_stable if all([graded[i] < v for v in values_to_ignore])]
+        mask = [i for i, _ in enumerate(binary) if i in mask_stable or i in mask_changed]
+        # remove high-graded stable words
+        targets, graded, binary = targets[mask], graded[mask], binary[mask]
+
+        mask_changed = [i for i, k in enumerate(binary) if k]
+        mask_stable = [i for i, k in enumerate(binary) if not k]
+
+        return targets, graded, binary, mask_stable, mask_changed, mask
+
+    def _cross_validation(self, y_changed: np.array, y_stable: np.array,
+                         train_sets: list, test_sets: list) -> dict:
+        """
+        Computes cross-validation statistics for a prediction task.
+
+        Args:
+            y_changed(np.array): The predicted values for changed words.
+            y_stable(np.array): The predicted values for stable words.
+            train_sets(list): A list of indices defining the samples in each training set.
+            test_sets(list): A list of indices defining the samples in each test set.
+        Returns:
+            dict containing cross-validation stats
+        """
+
+        # -- Gold scores --
+        y_true_stable = self.gt['graded'][self.gt['mask_stable']]
+        y_true_changed = self.gt['graded'][self.gt['mask_changed']]
+        labels_true_stable = np.zeros_like(y_true_stable)
+
+        # -- Train and Test sets --
+        cv_results = defaultdict(list)
+        for i in range(0, len(train_sets)):
+            # Corr (train, true)
+            corr, pvalue = spearman(y_true_changed[train_sets[i]], y_changed[train_sets[i]])
+            cv_results['cv_corr_train'].append(corr)
+            cv_results['cv_pvalue_train'].append(pvalue)
+
+            # Corr (test, true)
+            corr, pvalue = spearman(y_true_changed[test_sets[i]], y_changed[test_sets[i]])
+            cv_results['cv_corr_test'].append(corr)
+            cv_results['cv_pvalue_test'].append(pvalue)
+
+            # stable+test
+            y = np.concatenate([y_stable, y_changed[test_sets[i]]])
+            labels_true = np.concatenate([labels_true_stable, np.ones_like(y_changed[test_sets[i]])])
+
+            # Corr (stable+test, true)
+            corr, pvalue = spearman(np.concatenate([y_true_stable, y_true_changed[test_sets[i]]]), y)
+            cv_results['cv_corr'].append(corr)
+            cv_results['cv_pvalue'].append(pvalue)
+
+            # Acc, Pr, Re, F1, AUC (stable+test, true)
+            acc, thr = accuracy(labels_true, y)
+            labels = np.array([1 if i >= thr else 0 for i in y])
+            precision, recall, thresholds = precision_recall_curve(labels_true, labels)
+            f1 = f1_score(labels_true, labels)
+
+            if np.unique(labels).shape[0] != 2:
+                auc_roc, auc_pr = 0, 0
+            else:
+                auc_roc = roc_auc_score(labels_true, labels)
+                auc_pr = auc_score(recall, precision)
+
+            cv_results['cv_precision'].append(precision)
+            cv_results['cv_recall'].append(recall)
+            cv_results['cv_f1'].append(f1)
+            cv_results['cv_acc'].append(acc)
+            cv_results['cv_thr'].append(thr)
+            cv_results['cv_auc_roc'].append(auc_roc)
+            cv_results['cv_auc_pr'].append(auc_pr)
+
+        for k in list(cv_results):
+            if k in ['cv_precision', 'cv_recall']: continue
+            cv_results[f'{k}_mean'] = np.array(cv_results[k]).mean()
+            cv_results[f'{k}_std'] = np.array(cv_results[k]).std()
+            cv_results[f'{k}_max'] = np.array(cv_results[k]).max()
+            cv_results[f'{k}_min'] = np.array(cv_results[k]).min()
+
+        return cv_results
+
+    def _cross_validation_regression(self, y_changed: np.array,
+                                    y_stable: np.array,
+                                    train_sets: list, test_sets: list) -> dict:
+        """
+        Computes cross-validation statistics for trained regressors
+
+        Args:
+            y_changed(np.array): The predicted values for changed words.
+            y_stable(np.array): The predicted values for stable words.
+            train_sets(list): A list of indices defining the samples in each training set.
+            test_sets(list): A list of indices defining the samples in each test set.
+        Returns:
+            dict containing cross-validation stats
+        """
+
+        # -- Gold scores --
+        y_true_stable = self.gt['graded'][self.gt['mask_stable']]
+        y_true_changed = self.gt['graded'][self.gt['mask_changed']]
+        labels_true_stable = np.zeros_like(y_true_stable)
+
+        # -- Train and Test sets --
+        cv_results = defaultdict(list)
+        for i in range(0, len(train_sets)):
+            # Regressor trained only on a train set of target words
+            reg = LinearRegression().fit(y_changed[train_sets[i]], y_true_changed[train_sets[i]])
+
+            # Regressor's prediction for the train set
+            y = reg.predict(y_changed[train_sets[i]])
+
+            # Corr (train, true)
+            corr, pvalue = spearman(y_true_changed[train_sets[i]], y)
+            cv_results['cv_corr_train'].append(corr)
+            cv_results['cv_pvalue_train'].append(pvalue)
+
+            # Corr (test, true)
+            y = reg.predict(y_changed[test_sets[i]])
+            corr, pvalue = spearman(y, y_true_changed[test_sets[i]])
+            cv_results['cv_corr_test'].append(corr)
+            cv_results['cv_pvalue_test'].append(pvalue)
+
+            # Scores stable+test
+            y = np.concatenate([y_stable, y_changed[test_sets[i]]])
+            y = reg.predict(y)
+            labels_true = np.concatenate([labels_true_stable, np.ones_like(y[labels_true_stable.shape[0]:])])
+
+            # Corr (stable+test, true)
+            corr, pvalue = spearman(np.concatenate([y_true_stable, y_true_changed[test_sets[i]]]), y)
+            cv_results['cv_corr'].append(corr)
+            cv_results['cv_pvalue'].append(pvalue)
+
+            # Acc, Pr, Re, F1, AUC (stable+test, true)
+            acc, thr = accuracy(labels_true, y)
+            labels = np.array([1 if i >= thr else 0 for i in y])
+            precision, recall, thresholds = precision_recall_curve(labels_true, labels)
+            f1 = f1_score(labels_true, labels)
+
+            if np.unique(labels).shape[0] != 2:
+                auc_roc, auc_pr = 0, 0
+            else:
+                auc_roc = roc_auc_score(labels_true, labels)
+                auc_pr = auc_score(recall, precision)
+
+            cv_results['cv_precision'].append(precision)
+            cv_results['cv_recall'].append(recall)
+            cv_results['cv_f1'].append(f1)
+            cv_results['cv_acc'].append(acc)
+            cv_results['cv_thr'].append(thr)
+            cv_results['cv_auc_roc'].append(auc_roc)
+            cv_results['cv_auc_pr'].append(auc_pr)
+
+        for k in list(cv_results):
+            if k in ['cv_precision', 'cv_recall']: continue
+            cv_results[f'{k}_mean'] = np.array(cv_results[k]).mean()
+            cv_results[f'{k}_std'] = np.array(cv_results[k]).std()
+            cv_results[f'{k}_max'] = np.array(cv_results[k]).max()
+            cv_results[f'{k}_min'] = np.array(cv_results[k]).min()
+
+        return cv_results
+    
+    def mix_measures(self, depth: int = 3, standardize: bool = True) -> pd.DataFrame:
+        """
+        Mix measure scores and evaluate performance for LSC detection
+
+        Args:
+            depth (int, default=3): the size of the possible combinations
+            standardize (bool, default=True): If True, score are standardized
+
+        Returns:
+            pd.DataFrame containing the analysis results
+        """
+
+        # -- Prototype embeddings --
+        PE1, PE2 = self.dh.load_all_prototype_embeddings(self.dataset, self.model, self.layers, self.name)
+
+        # -- Distance matrix between embeddings --
+        proto_dist = prototype_distance_matrix(PE1, PE2)
+
+        # -- Prdedictions with different measures --
+        y_preds_dict = dict()
+
+        # Prototype Hausdorff Distance
+        y_preds_dict['ProtoHD'] = lsc_measuring(PE1, PE2,
+                                                lambda x1, x2: directed_hausdorff(x1, x2)[0])[self.gt['mask']]
+
+        # Frobenius Norm
+        y_preds_dict['Fnorm'] = lsc_measuring(proto_dist, None,
+                                              lambda x: np.linalg.norm(x, 'fro'))[self.gt['mask']]
+
+        # Condition Number
+        y_preds_dict['Cond'] = lsc_measuring(proto_dist, None,
+                                             lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
+
+        # ERank
+        y_preds_dict['Erank'] = lsc_measuring(proto_dist, None,
+                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
+
+        # Average of PRT over different layers
+        y_preds_dict['AvgPRT'] = lsc_measuring(proto_dist, None,
+                                               lambda x: np.diag(x).mean())[self.gt['mask']]
+
+        # set seed in order to make result reproducibile
+        set_seed(SEED)
+
+        for layer in range(1, self.layers + 1):
+            y = self.dh.load_scores(self.dataset, self.model if 'Russian' not in self.dataset else self.model + '_40',
+                                    layer)
+
+            # old measures
+            y_preds_dict[f'APD{layer}'] = y[y['measure'] == 'apd_cosine'].score.values[self.gt['mask']]
+            y_preds_dict[f'PRT{layer}'] = y[y['measure'] == 'prt'].score.values[self.gt['mask']]
+            y_preds_dict[f'HD{layer}'] = y[y['measure'] == 'hd'].score.values[self.gt['mask']]
+
+            # new measures with different distance matrix
+            # E1, E2 = self.dh.load_embeddings(self.dataset, self.model, layer, self.name)
+
+            # random pick words
+            # E1 = {word: E1[word][torch.randint(E1[word].shape[0], (100,))] for word in E1}
+            # E2 = {word: E2[word][torch.randint(E2[word].shape[0], (100,))] for word in E2}
+
+            # distance_matrix = {word: cdist(E1[word], E2[word], metric='cosine') for word in E1}
+
+            # y_preds_dict[f'Fnorm{layer}'] = lsc_measuring(distance_matrix, None, lambda x: np.linalg.norm(x, 'fro'))[mask]
+            # y_preds_dict[f'Erank{layer}'] = lsc_measuring(distance_matrix, None,
+            #                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[mask]
+
+        # additional info
+        y_preds_dict['word'] = self.gt['targets']
+        y_preds_dict['change'] = self.gt['binary']
+
+        # measure to combine
+        measures_list = set([i for i in y_preds_dict.keys() if i not in ['word', 'change']])
+
+        # -- Standardization --
+        if standardize:
+            for m in measures_list:
+                y_preds_dict[m] = (y_preds_dict[m] - y_preds_dict[m].mean()) / y_preds_dict[m].std()
+
+        # -- Combinations --
+        combs = list()
+        for i in range(2, depth + 1):
+            combs += list(combinations(measures_list, i))
+
+        # -- Result wrapper --
+        for comb in combs:
+            # - Geometrical mean
+            comb_name = 'gmean ' + '-'.join(comb)
+            values = gmean([y_preds_dict[m] for m in comb], axis=0)
+            if not np.isnan(values).any():
+                y_preds_dict[comb_name] = values
+
+            # - Aritmetic mean
+            comb_name = 'mean ' + '-'.join(comb)
+            y_preds_dict[comb_name] = np.mean([y_preds_dict[m] for m in comb], axis=0)
+
+            # - Sum
+            comb_name = 'sum ' + '-'.join(comb)
+            y_preds_dict[comb_name] = np.sum([y_preds_dict[m] for m in comb], axis=0)
+
+            # - Linear regression
+            comb_name = 'reg ' + '-'.join(comb)
+            X = np.stack([y_preds_dict[m] for m in comb]).T
+            reg = LinearRegression().fit(X, self.gt['graded'])
+            y_preds_dict[comb_name] = reg.predict(X)
+            y_preds_dict[comb_name + ' X'] = X
+
+            # print(reg.score(X, y))
+            # print(reg.coef_)
+            # print(reg.intercept_)
+
+        # -- Result wrapper --
+        results = list()
+        for comb_name in tqdm([k for k in y_preds_dict if not k.endswith(' X') and k not in ['word', 'change']], desc='Combining measures'):
+            
+            # score
+            y = y_preds_dict[comb_name]
+            
+            # Corr, Acc, Pr, Re, F1, AUCs (preiction, true)
+            corr, pvalue = spearman(self.gt['graded'], y)
+            acc, thr = accuracy(self.gt['binary'], y)
+            labels = np.array([1 if i >= thr else 0 for i in y])
+            precision, recall, thresholds = precision_recall_curve(self.gt['binary'], labels)
+            f1 = f1_score(self.gt['binary'], labels)
+
+            if np.unique(labels).shape[0] != 2:
+                auc_roc, auc_pr = 0, 0
+            else:
+                auc_roc = roc_auc_score(self.gt['binary'], labels)
+                auc_pr = auc_score(recall, precision)
+
+            # changed evaluation - Corr (changed, true)
+            changed_corr, changed_pvalue = spearman(y[self.gt['mask_changed']],
+                                                    self.gt['graded'][self.gt['mask_changed']])
+
+            # stable evaluation - Corr (stable, true)
+            stable_corr, stable_pvalue = spearman(y[self.gt['mask_stable']], self.gt['graded'][self.gt['mask_stable']])
+
+            tmp = dict(idx=comb_name,
+                       corr=corr, pvalue=pvalue,
+                       acc=acc, thr=thr, auc_roc=auc_roc, auc_pr=auc_pr,
+                       changed_corr=changed_corr, changed_pvalue=changed_pvalue,
+                       stable_corr=stable_corr, stable_pvalue=stable_pvalue, precision=precision,
+                       recall=recall, f1=f1,
+                       y_preds=y)
+
+            # cross validation
+            if not comb_name.startswith('reg '):
+                cv_results = self._cross_validation(y[self.gt['mask_changed']], y[self.gt['mask_stable']],
+                                                   self.changed_train_sets, self.changed_test_sets)
+            else:
+                y = y_preds_dict[comb_name + ' X']
+                cv_results = self._cross_validation_regression(y[self.gt['mask_changed']], y[self.gt['mask_stable']],
+                                                              self.changed_train_sets, self.changed_test_sets)
+            # cross validation info
+            for k in cv_results:
+                tmp[k] = cv_results[k]
+
+            results.append(tmp)
+
+        return pd.DataFrame(results)
+
+    def mix_layers(self, depth: int = 4) -> pd.DataFrame:
         """
         Evaluate the performance of mixed embeddings (extracted from different layers)
         with different combinations and aggregation methods.
@@ -297,27 +614,16 @@ class BruteForce:
             - score (np.array): predicted scores with the idx combination
         """
 
-        # combinations
+        # -- Combinations --
         combs = list()
         for i in range(2, depth + 1):
             combs += list(combinations(list(range(1, self.layers + 1)), i))
 
-        # ground truth
-        binary = self.dh.load_binary(self.dataset, self.name).score.values
-        graded = self.dh.load_graded(self.dataset, self.name).score.values
-
-        # mask
-        mask_stable, mask_changed = list(), list()
-        for i, k in enumerate(binary):
-            if not k:
-                mask_stable.append(i)
-            else:
-                mask_changed.append(i)
-
+        # -- Embeddings from time step 1 and 2 --
         E1, E2 = self.dh.load_all_embeddings(self.dataset, self.model, self.layers, self.name)
 
-        # Results
-        res = list()
+        # -- Results wrapper --
+        results = list()
         for comb in tqdm(combs, desc='Combining embeddings'):
             for agg in ['mean', 'concat']:
                 comb_name = '-'.join([f'L{l}' for l in comb])
@@ -329,290 +635,53 @@ class BruteForce:
                 set_seed(SEED)
 
                 for k, v in {'apd': apd, 'prt': prt}.items():
-                    y = lsc_measuring(E1_mix, E2_mix, v)
+                    y = lsc_measuring(E1_mix, E2_mix, v)[self.gt['mask']]
 
-                    # full evaluation
-                    corr, pvalue = spearman(y, graded)
-                    acc, thr = accuracy(y, binary)
-                    labels = np.array([1 if i >= thr else 0 for i in graded])
+                    # Corr, Acc, F1, Pr, Re, AUC (prediction, true)
+                    corr, pvalue = spearman(self.gt['graded'], y)
+                    acc, thr = accuracy(self.gt['binary'], y)
+                    labels = np.array([1 if i >= thr else 0 for i in y])
 
-                    # one label
+                    precision, recall, thresholds = precision_recall_curve(self.gt['binary'], labels)
+                    f1 = f1_score(self.gt['binary'], labels)
+
                     if np.unique(labels).shape[0] != 2:
-                        auc_roc = 0
-                        auc_pr = 0
+                        auc_roc, auc_pr = 0, 0
                     else:
-                        auc_roc = roc_auc_score(labels, binary)
-                        precision, recall, thresholds = precision_recall_curve(labels, binary)
+                        auc_roc = roc_auc_score(self.gt['binary'], labels)
                         auc_pr = auc_score(recall, precision)
 
-                    # changed evaluation
-                    changed_corr, changed_pvalue = spearman(y[mask_changed], graded[mask_changed])
+                    # changed evaluation - Corr (changed, true)
+                    changed_corr, changed_pvalue = spearman(y[self.gt['mask_changed']],
+                                                            self.gt['graded'][self.gt['mask_changed']])
 
-                    # stable evaluation
-                    stable_corr, stable_pvalue = spearman(y[mask_stable], graded[mask_stable])
+                    # stable evaluation - Corr (stable, true)
+                    stable_corr, stable_pvalue = spearman(y[self.gt['mask_stable']],
+                                                          self.gt['graded'][self.gt['mask_stable']])
 
-                    res.append(dict(idx=comb_name, agg=agg,
-                                    corr=corr, pvalue=pvalue,
-                                    acc=acc, thr=thr,
-                                    auc_roc=auc_roc, auc_pr=auc_pr,
-                                    changed_corr=changed_corr, changed_pvalue=changed_pvalue,
-                                    stable_corr=stable_corr, stable_pvalue=stable_pvalue,
-                                    score=y,
-                                    measure=k
-                                    ))
-        return res
+                    # permutation test
+                    # pt_pvalue = permutation_test(graded, row['y_preds'])
+                    # changed_pt_pvalue = permutation_test(graded[mask_changed], row['y_preds'][mask_changed])
+                    # stable_pt_pvalue = permutation_test(graded[mask_stable], row['y_preds'][mask_stable])
 
-    def evaluate_mix_measure(self, depth: int = 3, standardize: bool = True) -> list:
-        """
-        Evaluate the performance of mixed measures with different aggregation methods.
+                    tmp = dict(idx=comb_name, agg=agg,
+                               corr=corr, pvalue=pvalue,
+                               acc=acc, thr=thr,
+                               auc_roc=auc_roc, auc_pr=auc_pr,
+                               changed_corr=changed_corr, changed_pvalue=changed_pvalue,
+                               stable_corr=stable_corr, stable_pvalue=stable_pvalue,
+                               score=y,
+                               measure=k, precision=precision, recall=recall, f1=f1)
 
-        Args:
-            depth (int, default=3): the size of the possible combinations
-            standardize (bool, default=True): If True, score are standardized
+                    # cross validation test
+                    cv_results = self._cross_validation(y[self.gt['mask_changed']], y[self.gt['mask_stable']],
+                                                       self.changed_train_sets, self.changed_test_sets)
+                    for k in cv_results:
+                        tmp[k] = cv_results[k]
 
-        Returns:
-            a list of dictionaries containing the evaluation results for each combination and aggregation method.
-            Each dictionary contains the following keys:
-            - idx (str): the combination idx.
-            - agg (str): the aggregation method used for the combination of .
-            - corr (float): the Spearman correlation between the predicted and true scores.
-            - pvalue (float): the p-value associated with the Spearman correlation.
-            - acc (float): the accuracy of the predicted labels.
-            - thr (float): the threshold used to generate the predicted labels.
-            - auc_roc (float): the area under the ROC curve for the predicted labels.
-            - auc_pr (float): the area under the precision-recall curve for the predicted labels.
-            - changed_corr (float): the Spearman correlation between the predicted and true scores for the changed words only.
-            - changed_pvalue (float): the p-value associated with the Spearman correlation for the changed words only.
-            - stable_corr (float): the Spearman correlation between the predicted and true scores for the stable words only.
-            - stable_pvalue (float): the p-value associated with the Spearman correlation for the stable words only.
-            - score (np.array): predicted scores with the idx combination
-        """
-
-        targets = self.dh.load_targets(self.dataset, self.name).word.values
-        binary = self.dh.load_binary(self.dataset, self.name).score.values
-        graded = self.dh.load_graded(self.dataset, self.name).score.values
-
-        # -- Prototype embeddings --
-        PE1, PE2 = self.dh.load_all_prototype_embeddings(self.dataset, self.model, self.layers, self.name)
-
-        # -- Distance matrix between embeddings --
-        proto_dist = prototype_distance_matrix(PE1, PE2)
+                    results.append(tmp)
         
-        new_measures = dict()
-
-        # Prototype Hausdorff Distance
-        new_measures['ProtoHD'] = lsc_measuring(PE1, PE2, lambda x1, x2: directed_hausdorff(x1, x2)[0])
-
-        # Frobenius Norm
-        new_measures['Fnorm'] = lsc_measuring(proto_dist, None, lambda x: np.linalg.norm(x, 'fro'))
-
-        # Condition Number
-        new_measures['Cond'] = lsc_measuring(proto_dist, None, lambda x: np.linalg.cond(x, 'fro'))
-        
-        # ERank
-        new_measures['Erank'] = lsc_measuring(proto_dist, None,
-                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))
-
-        
-        # Average of PRT over different layers
-        new_measures['AvgPRT'] = lsc_measuring(proto_dist, None, lambda x: np.diag(x).mean())
-
-        set_seed(SEED)
-        for layer in range(1, self.layers + 1):
-            y = self.dh.load_scores(self.dataset, self.model if 'Russian' not in self.dataset else self.model+'_40', layer)
-
-            # old measures
-            new_measures[f'APD{layer}'] = y[y['measure'] == 'apd_cosine'].score.values
-            new_measures[f'PRT{layer}'] = y[y['measure'] == 'prt'].score.values
-            new_measures[f'HD{layer}'] = y[y['measure'] == 'hd'].score.values
-
-            # new measures with different distance matrix
-            #E1, E2 = self.dh.load_embeddings(self.dataset, self.model, layer, self.name)
-
-            # random pick words
-            #E1 = {word: E1[word][torch.randint(E1[word].shape[0], (100,))] for word in E1}
-            #E2 = {word: E2[word][torch.randint(E2[word].shape[0], (100,))] for word in E2}
-
-            #distance_matrix = {word: cdist(E1[word], E2[word], metric='cosine') for word in E1}
-
-            #new_measures[f'Fnorm{layer}'] = lsc_measuring(distance_matrix, None, lambda x: np.linalg.norm(x, 'fro'))
-            #new_measures[f'Erank{layer}'] = lsc_measuring(distance_matrix, None,
-            #                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))
-
-        # additional info
-        new_measures['word'] = targets
-        new_measures['change'] = binary
-
-        tmp = new_measures.copy()
-
-        # measure to mix
-        measures = set([i for i in tmp.keys() if i not in ['word', 'change']])
-
-        # standardize
-        if standardize:
-            for m in measures:
-                tmp[m] = (tmp[m] - tmp[m].mean()) / tmp[m].std()
-
-        # combinations
-        combs = list()
-        for i in range(2, depth + 1):
-            combs += list(combinations(measures, i))
-
-        for comb in combs:
-            comb_name = 'gmean ' + '-'.join(comb)
-            tmp[comb_name] = gmean([tmp[m] for m in comb], axis=0)
-            comb_name = 'mean ' + '-'.join(comb)
-            tmp[comb_name] = np.mean([tmp[m] for m in comb], axis=0)
-            comb_name = 'sum ' + '-'.join(comb)
-            tmp[comb_name] = np.sum([tmp[m] for m in comb], axis=0)
-
-        # mask
-        mask_changed = [i for i, k in enumerate(binary) if k]
-        mask_stable = [i for i, k in enumerate(binary) if not k]
-
-        # results
-        res = list()
-        for comb_name in tqdm(list(tmp.keys()), desc='Combining measures'):
-            if comb_name in ['word', 'score', 'change']: continue
-
-            # get aggregation
-            agg = comb_name.split()[0]
-
-            # score
-            y = tmp[comb_name]
-
-            # full evaluation
-            try:
-                corr, pvalue = spearman(y, graded)
-                acc, thr = accuracy(y, binary)
-                labels = np.array([1 if i >= thr else 0 for i in graded])
-
-                auc_roc = roc_auc_score(labels, binary)
-                precision, recall, thresholds = precision_recall_curve(labels, binary)
-                auc_pr = auc_score(recall, precision)
-            except:
-                if pvalue != pvalue:
-                    corr, pvalue = 0,0
-                acc, thr, auc_roc, auc_pr = 0,0,0,0
-                # something wrong with nan values
-                #continue
-
-            # changed evaluation
-            changed_corr, changed_pvalue = spearman(y[mask_changed], graded[mask_changed])
-
-            # stable evaluation
-            stable_corr, stable_pvalue = spearman(y[mask_stable], graded[mask_stable])
-
-            res.append(dict(idx=comb_name, agg=agg, corr=corr, pvalue=pvalue,
-                            acc=acc, thr=thr, auc_roc=auc_roc, auc_pr=auc_pr,
-                            changed_corr=changed_corr, changed_pvalue=changed_pvalue,
-                            stable_corr=stable_corr, stable_pvalue=stable_pvalue, score=y))
-
-        return res
-
-    def validation(self, res:list, topn:int=None,#TODO:100
-                   n_combinations: int = 100, percent: int = 40, sort_by:list=['changed_corr', 'acc']):
-        """
-        Args:
-            res(list): scores results
-            topn(int, default=100): validate only the top n combinations
-            n_combinations(int, default=1000): number of combinations/permutations for cross validation and permutation test
-            percent(int, default=40): percentage of words to keep in the test sets
-            sort_by(list, default=['corr', 'acc']): consider the top n combination sorted by 'sort_by' values
-        
-        Returns:
-            a list of dictionaries containing the evaluation results for each combination and aggregation method.
-            Each dictionary contains the following keys:
-            - idx (str): the combination idx.
-            - agg (str): the aggregation method used for the combination of .
-            - corr (float): the Spearman correlation between the predicted and true scores.
-            - pvalue (float): the p-value associated with the Spearman correlation.
-            - acc (float): the accuracy of the predicted labels.
-            - thr (float): the threshold used to generate the predicted labels.
-            - auc_roc (float): the area under the ROC curve for the predicted labels.
-            - auc_pr (float): the area under the precision-recall curve for the predicted labels.
-            - changed_corr (float): the Spearman correlation between the predicted and true scores for the changed words only.
-            - changed_pvalue (float): the p-value associated with the Spearman correlation for the changed words only.
-            - stable_corr (float): the Spearman correlation between the predicted and true scores for the stable words only.
-            - stable_pvalue (float): the p-value associated with the Spearman correlation for the stable words only.
-            - score (np.array): predicted scores with the idx combination
-            - pt_pvalue (float): pvalue of permutation test computed over the set of target words
-            - stable_pt_pvalue (float): pvalue of permutation test computed over the set of stable words
-            - changed_pt_pvalue (float): pvalue of permutation test computed over the set of changed words
-            - changed_corr_test (float): average correlation obtained over the test set of changed words through cross-validation
-            - changed_corr_train (float): average correlation obtained over the train set of changed words through cross-validation
-            - changed_pvalue_test (float): average pvalue obtained over the test set of changed words through cross-validation
-            - changed_pvalue_train (float): average pvalue obtained over the train set of changed words through cross-validation
-        """
-        
-        
-        set_seed(SEED)
-        binary = self.dh.load_binary(self.dataset, self.name).score.values
-        graded = self.dh.load_graded(self.dataset, self.name).score.values
-        mask_changed = [i for i, k in enumerate(binary) if k]
-        mask_stable = [i for i, k in enumerate(binary) if not k]
-
-        if 'Russian' not in self.dataset:
-            ascending=False
-        else:
-            ascending=[True, False]
-
-        res = pd.DataFrame(res)
-        res = res.sort_values(sort_by, ascending=ascending).reset_index(drop=True).head(topn if topn is not None else res.shape[0])
-
-        # -- Train and test sets --
-        n_changed_words = binary[mask_changed].shape[0]
-        n_changed_words_per_test_set = int(n_changed_words * percent / 100)
-
-        tmp = list(range(0, n_changed_words))
-        changed_test_sets, changed_train_sets = list(), list()
-        for i in range(n_combinations):
-            random.shuffle(tmp)
-            changed_test_sets.append(tmp[:n_changed_words_per_test_set])
-            changed_train_sets.append(tmp[n_changed_words_per_test_set:])
-
-        #changed_test_sets = [list(i) for i in combinations(list(range(0, n_changed_words)), n_changed_words_per_test_set)]
-        #random.shuffle(changed_test_sets)
-        #changed_test_sets = changed_test_sets[:n_combinations]
-        #changed_train_sets = [[i for i in range(0, n_changed_words) if i not in t] for t in changed_test_sets]
-
-        
-        # results
-        new_res = dict(pt_pvalue=list(), stable_pt_pvalue=list(), changed_pt_pvalue=list(),
-                       changed_corr_test=list(), changed_corr_train=list(),
-                       changed_pvalue_test=list(), changed_pvalue_train=list())
-        new_res = dict(cv_score_train=list(), cv_score_test=list(), cv_pvalue_train=list(), cv_pvalue_test=list(), cv_corr=list(),
-                       cv_pvalue=list(), cv_acc=list(), cv_thr=list(), cv_auc_roc=list(), cv_auc_pr=list())
-
-        
-        for i, row in tqdm(res.iterrows(), total=topn if topn is not None else res.shape[0]):
-            # permutation test
-            #TODO:pt_pvalue = permutation_test(row['score'], graded)
-            #TODO:changed_pt_pvalue = permutation_test(row['score'][mask_changed], graded[mask_changed])
-            #TODO:stable_pt_pvalue = permutation_test(row['score'][mask_stable], graded[mask_stable])
-
-            # cross validation test
-            #changed_corr_train, changed_pvalue_train, changed_corr_test, changed_pvalue_test =
-            tmp=cross_validation(
-                row['score'][mask_changed], graded[mask_changed], changed_train_sets, changed_test_sets, graded_stable=row['score'][mask_stable], binary_true=binary, graded_true=graded)#TODO:last arg
-
-            #TODO:new_res['pt_pvalue'].append(pt_pvalue)
-            #TODO:new_res['stable_pt_pvalue'].append(stable_pt_pvalue)
-            #TODO:new_res['changed_pt_pvalue'].append(changed_pt_pvalue)
-            #TODO:new_res['changed_corr_test'].append(changed_corr_test)
-            #TODO:new_res['changed_corr_train'].append(changed_corr_train)
-            #TODO:new_res['changed_pvalue_test'].append(changed_pvalue_test)
-            #TODO:new_res['changed_pvalue_train'].append(changed_pvalue_train)
-            for k in tmp:
-                new_res[k].append(tmp[k])
-                
-        for k in new_res:
-            res[k] = new_res[k]
-
-        res['score'] = [arr.tolist() for arr in res['score']]
-        
-        return res
-
+        return pd.DataFrame(results)
 
 if __name__ == '__main__':
     import argparse
@@ -640,24 +709,23 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output_folder',
                         type=str, default='',
                         help='Name of the output folder where results will be stored')
+    parser.add_argument('-s', '--stable_words_to_ignore',
+                        type=int, default=0,
+                        help='Remove remove n stable words larger than the smallest changed words')
     args = parser.parse_args()
 
-    b = BruteForce(args.main_folder, args.dataset, args.model, args.layers, args.name)
-    #res = b.evaluate_mix_embeddings(args.depth+1)
-    #res = b.validation(res, sort_by=['corr', 'acc'])
-
+    # output folder
     out_folder = f'{args.output_folder}/LSC/{args.dataset}/{args.model}'
     Path(out_folder).mkdir(parents=True, exist_ok=True)
-    #res.to_csv(f'{out_folder}/bf_mix_embeddings.txt', index=False, sep='\t')
 
-    res = b.evaluate_mix_measure(args.depth, standardize=False)
-    res_corr = b.validation(res, sort_by=['corr', 'acc'])
-    res_corr.to_csv(f'{out_folder}/bf_mix_measures_corr.txt', index=False, sep='\t')
-    #res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
-    #res_changed_corr.to_csv(f'{out_folder}/bf_mix_measures_changed_corr.txt', index=False, sep='\t')
-    
-    res = b.evaluate_mix_measure(args.depth, standardize=True)
-    res_corr = b.validation(res, sort_by=['corr', 'acc'])
-    res_corr.to_csv(f'{out_folder}/bf_mix_std_measures_corr.txt', index=False, sep='\t')
-    #res_changed_corr = b.validation(res, sort_by=['changed_corr', 'acc'])
-    #res_changed_corr.to_csv(f'{out_folder}/bf_mix_std_measures_changed_corr.txt', index=False, sep='\t')
+    b = BruteForce(args.main_folder, args.dataset, args.model, args.layers,
+                   ignore_n_stable=args.stable_words_to_ignore)
+
+    res = b.mix_measures(args.depth, standardize=True)
+    res.to_csv(f'{out_folder}/mix_std_measures_{args.stable_words_to_ignore}.txt', index=False, sep='\t')
+
+    res = b.mix_measures(args.depth, standardize=False)
+    res.to_csv(f'{out_folder}/mix_measures_{args.stable_words_to_ignore}.txt', index=False, sep='\t')
+
+    res = b.mix_layers(args.depth + 1)
+    res.to_csv(f'{out_folder}/mix_layers_{args.stable_words_to_ignore}.txt', index=False, sep='\t')

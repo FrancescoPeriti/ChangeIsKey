@@ -32,6 +32,7 @@ source venv/bin/activate
 #bash "script/download/swedish_download.sh" "${datasets_folder}"
 #bash "script/download/latin_download.sh" "${datasets_folder}"
 #bash "script/download/spanish_download.sh" "${datasets_folder}"
+bash "script/download/norwegian_download.sh" "${datasets_folder}" "${tokenization_folder}"
 
 # -- Tokenization --
 #sbatch "script/tokenization/english_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
@@ -49,6 +50,7 @@ source venv/bin/activate
 #sbatch "script/embedding_extraction/swedish_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 #sbatch "script/embedding_extraction/spanish_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 #sbatch "script/embedding_extraction/russian_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
+sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 
 # -- Attentions extraction --
 ##sbatch "script/attention_extraction/english_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
@@ -84,12 +86,19 @@ source venv/bin/activate
 #bash "script/mix_datasets.sh" "${datasets_folder}" "${embeddings_folder}" "${tokenization_folder}" "${attentions_folder}" "${score_folder}" "${labels_folder}"
 
 # -- Brute force --
-sbatch "script/brute_force/english_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-sbatch "script/brute_force/spanish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-sbatch "script/brute_force/german_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
-sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}"
+#sbatch "script/brute_force/english_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/spanish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/german_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/english_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/spanish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/german_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+
 
 # -- Attn scores --
 #sbatch "script/attn_lsc_measuring/english_attn_measuring.sh" "${attentions_folder}" "${datasets_folder}" "${tokenization_folder}" "${attn_score_folder}"

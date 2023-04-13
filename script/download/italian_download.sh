@@ -36,6 +36,9 @@ rm T0.txt T1.txt
 mkdir "${dataset_folder}/${italian}/truth"
 wget https://raw.githubusercontent.com/diacr-ita/data/master/test/gold.txt -O binary.txt
 mv binary.txt "${dataset_folder}/${italian}/truth"
+awk -v OFS="\t" '$1=$1' "${dataset_folder}/${italian}/truth/binary.txt" > tmp.out.it
+rm "${dataset_folder}/${italian}/truth/binary.txt"
+mv tmp.out.it "${dataset_folder}/${italian}/truth/binary.txt"
 cut -d ' ' -f1 "${dataset_folder}/${italian}/truth/binary.txt" > "${dataset_folder}/${italian}/targets.txt"
 
 cd "${current_folder}"

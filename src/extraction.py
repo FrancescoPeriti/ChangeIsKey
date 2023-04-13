@@ -232,7 +232,10 @@ class WordEmbeddingExtraction(Extraction):
                 input_tokens_str = self._tokens2str(row['input_ids'].tolist(), self.tokenizer)
                 word_tokens = batch_text[i]['sent'][batch_offset[i]['start']:batch_offset[i]['end']]
                 word_tokens_str = " ".join(self.tokenizer.tokenize(word_tokens))
-                pos = re.search(f"( +|^){word_tokens_str}(?!\w+| #)", input_tokens_str, re.DOTALL)
+                try:
+                    pos = re.search(f"( +|^){word_tokens_str}(?!\w+| #)", input_tokens_str, re.DOTALL)
+                except:
+                    print('--\n', f"( +|^){word_tokens_str}(?!\w+| #)", '\n', input_tokens_str)
 
                 # truncation side effect
                 if pos is None: continue

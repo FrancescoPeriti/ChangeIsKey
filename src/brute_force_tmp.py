@@ -1,5 +1,4 @@
 import torch
-import multiprocessing
 import random
 import pandas as pd
 import numpy as np
@@ -426,118 +425,8 @@ class BruteForce:
             cv_results[f'{k}_min'] = np.array(cv_results[k]).min()
 
         return cv_results
-
-    def mix_measures(self, depth:int=3, standardize:bool = True):
-        # -- Prototype embeddings --
-        PE1, PE2 = self.dh.load_all_prototype_embeddings(self.dataset, self.model, self.layers, self.name)
-
-        # -- Distance matrix between embeddings --
-        proto_dist = prototype_distance_matrix(PE1, PE2)
-        proto_sim = {w:1-proto_dist[w] for w in proto_dist}
-
-        # -- Prdedictions with different measures --
-        y_preds_dict = dict()
-
-        # Prototype Hausdorff Distance
-        y_preds_dict['ProtoHD'] = lsc_measuring(PE1, PE2,
-                                                lambda x1, x2: directed_hausdorff(x1, x2)[0])[self.gt['mask']]
-
-        # Frobenius Norm
-        y_preds_dict['Fnorm'] = lsc_measuring(proto_dist, None,
-                                              lambda x: np.linalg.norm(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['FnormCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: np.linalg.norm(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-FnormCS'] = lsc_measuring(proto_sim, None,
-                                                 lambda x: -np.linalg.norm(x, 'fro'))[self.gt['mask']]
-
-        y_preds_dict['-Fnorm'] = lsc_measuring(proto_dist, None,
-                                               lambda x: -np.linalg.norm(x, 'fro'))[self.gt['mask']]
-
-        # Condition Number
-        y_preds_dict['Cond'] = lsc_measuring(proto_dist, None,
-                                             lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['CondCS'] = lsc_measuring(proto_sim, None,
-                                             lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-Cond'] = lsc_measuring(proto_dist, None,
-                                              lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-CondCS'] = lsc_measuring(proto_sim, None,
-                                                lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]
-
-        # ERank
-        y_preds_dict['Erank'] = lsc_measuring(proto_dist, None,
-                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['ErankCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['-Erank'] = lsc_measuring(proto_dist, None,
-                                              lambda x: -np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['-ErankCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: -np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-
-
-        # Average of PRT over different layers
-        y_preds_dict['AvgPRT'] = lsc_measuring(proto_dist, None,
-                                               lambda x: np.diag(x).mean())[self.gt['mask']]
-
-        # set seed in order to make result reproducibile
-        set_seed(SEED)
-
-
-        for layer in range(1, self.layers + 1):
-            y = self.dh.load_scores(self.dataset, self.model if 'Russian' not in self.dataset else self.model + '_40',
-                                    layer)
-
-            # old measures
-            y_preds_dict[f'APD{layer}'] = y[y['measure'] == 'apd_cosine'].score.values[self.gt['mask']]
-            y_preds_dict[f'PRT{layer}'] = y[y['measure'] == 'prt'].score.values[self.gt['mask']]
-            y_preds_dict[f'HD{layer}'] = y[y['measure'] == 'hd'].score.values[self.gt['mask']]
-
-            # new measures with different distance matrix
-            # E1, E2 = self.dh.load_embeddings(self.dataset, self.model, layer, self.name)
-
-            # random pick words
-            # E1 = {word: E1[word][torch.randint(E1[word].shape[0], (100,))] for word in E1}
-            # E2 = {word: E2[word][torch.randint(E2[word].shape[0], (100,))] for word in E2}
-
-            # distance_matrix = {word: cdist(E1[word], E2[word], metric='cosine') for word in E1}
-
-            # y_preds_dict[f'Fnorm{layer}'] = lsc_measuring(distance_matrix, None, lambda x: np.linalg.norm(x, 'fro'))[mask]
-            # y_preds_dict[f'Erank{layer}'] = lsc_measuring(distance_matrix, None,
-            #                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[mask]
-
-        # additional info
-        y_preds_dict['word'] = self.gt['targets']
-        y_preds_dict['change'] = self.gt['binary']
-
-        # measure to combine
-        measures_list = set([i for i in y_preds_dict.keys() if i not in ['word', 'change']])
-        
-        combs = list()
-        for i in range(1, depth + 1):
-            combs += list(combinations(measures_list, i))
-
-        def list2chunks(combs) -> list:
-            """Split a list into evenly sized chunks"""
-            n = multiprocessing.cpu_count()
-            k, m = divmod(len(combs), n)
-            return (combs[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
-
-        all_processes = list()
-        shared_list = multiprocessing.Manager().list()
-        for sub_list in list2chunks(combs):
-            p = multiprocessing.Process(target=self.mix_measures_, args=(sub_list, shared_list,
-                                                              standardize))
-        all_processes.append(p)
-        p.start()
-
-        for p in all_processes:
-            p.join()
-            
-        shared_list = list(shared_list)
-        return pd.DataFrame(shared_list)
-
-        
     
-    def mix_measures_(self, combs, results, standardize: bool = True) -> pd.DataFrame:
+    def mix_measures(self, depth: int = 3, standardize: bool = True) -> pd.DataFrame:
         """
         Mix measure scores and evaluate performance for LSC detection
 
@@ -554,8 +443,7 @@ class BruteForce:
 
         # -- Distance matrix between embeddings --
         proto_dist = prototype_distance_matrix(PE1, PE2)
-        proto_sim = {w:1-proto_dist[w] for w in proto_dist}
-        
+
         # -- Prdedictions with different measures --
         y_preds_dict = dict()
 
@@ -566,33 +454,20 @@ class BruteForce:
         # Frobenius Norm
         y_preds_dict['Fnorm'] = lsc_measuring(proto_dist, None,
                                               lambda x: np.linalg.norm(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['FnormCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: np.linalg.norm(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-FnormCS'] = lsc_measuring(proto_sim, None,
-                                                 lambda x: -np.linalg.norm(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-Fnorm'] = lsc_measuring(proto_dist, None,
-                                               lambda x: -np.linalg.norm(x, 'fro'))[self.gt['mask']]
 
         # Condition Number
         y_preds_dict['Cond'] = lsc_measuring(proto_dist, None,
                                              lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['CondCS'] = lsc_measuring(proto_sim, None,
-                                             lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-Cond'] = lsc_measuring(proto_dist, None,
-                                              lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]
-        y_preds_dict['-CondCS'] = lsc_measuring(proto_sim, None,
-                                                lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]         
+        #y_preds_dict['CondCS'] = lsc_measuring(1-proto_dist, None,
+        #                                     lambda x: np.linalg.cond(x, 'fro'))[self.gt['mask']]
+        #y_preds_dict['-Cond'] = lsc_measuring(proto_dist, None,
+        #                                      lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]
+        #y_preds_dict['-CondCS'] = lsc_measuring(1-proto_dist, None,
+        #                                        lambda x: -np.linalg.cond(x, 'fro'))[self.gt['mask']]         
 
         # ERank
         y_preds_dict['Erank'] = lsc_measuring(proto_dist, None,
                                               lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['ErankCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['-Erank'] = lsc_measuring(proto_dist, None,
-                                              lambda x: -np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        y_preds_dict['-ErankCS'] = lsc_measuring(proto_sim, None,
-                                              lambda x: -np.exp(entropy(PCA().fit(x).singular_values_)))[self.gt['mask']]
-        
 
         # Average of PRT over different layers
         y_preds_dict['AvgPRT'] = lsc_measuring(proto_dist, None,
@@ -635,6 +510,11 @@ class BruteForce:
             for m in measures_list:
                 y_preds_dict[m] = (y_preds_dict[m] - y_preds_dict[m].mean()) / y_preds_dict[m].std()
 
+        # -- Combinations --
+        combs = list()
+        for i in range(2, depth + 1):
+            combs += list(combinations(measures_list, i))
+
         # -- Result wrapper --
         for comb in combs:
             # - Geometrical mean
@@ -663,6 +543,7 @@ class BruteForce:
             # print(reg.intercept_)
 
         # -- Result wrapper --
+        results = list()
         for comb_name in tqdm([k for k in y_preds_dict if not k.endswith(' X') and k not in ['word', 'change']], desc='Combining measures'):
             
             # score
@@ -710,7 +591,7 @@ class BruteForce:
 
             results.append(tmp)
 
-        return results
+        return pd.DataFrame(results)
 
     def mix_layers(self, depth: int = 4) -> pd.DataFrame:
         """

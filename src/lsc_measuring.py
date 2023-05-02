@@ -531,15 +531,15 @@ if __name__ == '__main__':
             scores.extend(form_based_scores)
 
             # clustering algorithm
-            for algo in ['ap', 'app']:
-                L1_path = f'{args.labels}/{model}/{algo}/corpus1/token/{l}/{word}.npy'
-                L2_path = f'{args.labels}/{model}/{algo}/corpus2/token/{l}/{word}.npy'
-                L1 = np.load(L1_path)
-                L2 = np.load(L2_path)
+            #for algo in ['ap', 'app']:
+            #    L1_path = f'{args.labels}/{model}/{algo}/corpus1/token/{l}/{word}.npy'
+            #    L2_path = f'{args.labels}/{model}/{algo}/corpus2/token/{l}/{word}.npy'
+            #    L1 = np.load(L1_path)
+            #    L2 = np.load(L2_path)
 
-                # fit - sense based
-                sense_based_scores = s.sense_based_fit(word, algo, E1, E2, L1, L2)
-                scores.extend(sense_based_scores)
+            #    # fit - sense based
+            #    sense_based_scores = s.sense_based_fit(word, algo, E1, E2, L1, L2)
+            #    scores.extend(sense_based_scores)
 
 
         Path(os.path.dirname(f'{args.output}/{l}/token.txt')).mkdir(parents=True, exist_ok=True)

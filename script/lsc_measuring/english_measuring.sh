@@ -8,7 +8,7 @@ label_folder="$2/LSC/SemEval-English"
 score_folder="$3/LSC/SemEval-English"
 dataset_folder="$4/LSC/SemEval-English"
 
-declare -a models=("bert-base-multilingual-cased" "bert-base-uncased")
+declare -a models=("cambridgeltl_mirrorwic-bert-base-uncased") #"bert-base-multilingual-cased" "bert-base-uncased")
 
 for model in "${models[@]}"
 do

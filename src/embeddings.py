@@ -61,4 +61,9 @@ for corpus in ['corpus1', 'corpus2']:
         # store embeddings
         for l in range(1, args.layers + 1):
             Path(f'{embeddings_output}/{l}/').mkdir(parents=True, exist_ok=True)
+
+            # BERT returns nan vectors
+            if 'NorDiaChange' in tokenization_input:
+                embeddings[l] = embeddings[l][~torch.any(embeddings[l].isnan(), dim=1)]
+            
             torch.save(embeddings[l].to('cpu'), f'{embeddings_output}/{l}/{word}.pt')

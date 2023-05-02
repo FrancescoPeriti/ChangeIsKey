@@ -59,7 +59,7 @@ class Clustering:
 
         pt_embs1 = torch.load(embs1).numpy()
         pt_embs2 = torch.load(embs2).numpy()
-
+        
         if self.algo == 'app':
             self.ap = APosterioriaffinityPropagation(affinity=self.affinity, damping=self.damping,
                                                      max_iter=self.max_iter,

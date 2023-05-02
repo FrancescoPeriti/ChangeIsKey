@@ -10,7 +10,7 @@ attn_score_folder="$4/LSC/SemEval-English"
 
 layers=12
 
-declare -a models=("bert-base-uncased") #("bert-base-multilingual-cased" "bert-base-uncased")
+declare -a models=("bert-base-multilingual-cased" "bert-base-uncased")
 
 for model in "${models[@]}"
 do

@@ -304,7 +304,7 @@ if __name__ == '__main__':
 
     # -- Target --
     words = [word.strip() for word in open(args.targets, mode='r', encoding='utf-8').readlines()]
-
+    
     # -- LSC scores by considering the attention of the full sentences --
     #res = lsc_leveraging_full_attn(words, args.attentions, args.model, layers=args.layers)
     #res = pd.DataFrame(res)

@@ -233,12 +233,22 @@ class WordEmbeddingExtraction(Extraction):
                 word_tokens = batch_text[i]['sent'][batch_offset[i]['start']:batch_offset[i]['end']]
                 word_tokens_str = " ".join(self.tokenizer.tokenize(word_tokens))
                 try:
-                    pos = re.search(f"( +|^){word_tokens_str}(?!\w+| #)", input_tokens_str, re.DOTALL)
+                    pos = re.search(f"( +|^){word_tokens_str}(?!\w+| ##)", input_tokens_str, re.DOTALL)
                 except:
                     print('--\n', f"( +|^){word_tokens_str}(?!\w+| #)", '\n', input_tokens_str)
 
                 # truncation side effect
-                if pos is None: continue
+                if pos is None:
+                    print(i, text[i]['sent'], input_tokens_str, len(input_tokens_str.split()), word_tokens_str)
+                    #print('truncation', len(row['input_ids'].tolist()))
+                    #pos = text[i]['sent'].find(word_tokens)
+                    #tmp = self.tokenizer(text[i]['sent'][pos-200:pos+200], return_tensors='pt', padding="max_length", max_length=max_length, truncation=True).to(self._device)
+                    #print(text[i]['sent'][pos-200:pos+200].replace(word_tokens, word_tokens.upper()))
+                    #input_ids = tmp['input_ids']
+                    #token_type_ids = tmp['token_type_ids']
+                    #attention_mask = tmp['attention_mask']
+                    #pos = re.search(f"( +|^){word_tokens_str}(?!\w+| #)", input_tokens_str, re.DOTALL)
+                    continue
 
                 pos = pos.start()
                 n_previous_tokens = len(input_tokens_str[:pos].split())

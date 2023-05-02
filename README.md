@@ -32,7 +32,7 @@ source venv/bin/activate
 #bash "script/download/swedish_download.sh" "${datasets_folder}"
 #bash "script/download/latin_download.sh" "${datasets_folder}"
 #bash "script/download/spanish_download.sh" "${datasets_folder}"
-bash "script/download/norwegian_download.sh" "${datasets_folder}" "${tokenization_folder}"
+#bash "script/download/norwegian_download.sh" "${datasets_folder}" "${tokenization_folder}"
 
 # -- Tokenization --
 #sbatch "script/tokenization/english_tokenization.sh" "${datasets_folder}" "${tokenization_folder}"
@@ -50,16 +50,17 @@ bash "script/download/norwegian_download.sh" "${datasets_folder}" "${tokenizatio
 #sbatch "script/embedding_extraction/swedish_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 #sbatch "script/embedding_extraction/spanish_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 #sbatch "script/embedding_extraction/russian_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
-sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
+#sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_folder}" "${embeddings_folder}" "${datasets_folder}"
 
 # -- Attentions extraction --
-##sbatch "script/attention_extraction/english_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+#sbatch "script/attention_extraction/english_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 ##sbatch "script/attention_extraction/german_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
-##sbatch "script/attention_extraction/italian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
-##sbatch "script/attention_extraction/latin_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+#sbatch "script/attention_extraction/italian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+#sbatch "script/attention_extraction/latin_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/swedish_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
-##sbatch "script/attention_extraction/spanish_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+#sbatch "script/attention_extraction/spanish_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 #sbatch "script/attention_extraction/russian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
+#sbatch "script/attention_extraction/norwegian_extraction.sh" "${tokenization_folder}" "${attentions_folder}" "${datasets_folder}"
 
 # -- Finetuning --
 #bash "script/bert_finetuning/english_finetuning.sh" "${datasets_folder}" "${tokenization_folder}" "${ft_models_folder}"
@@ -72,15 +73,17 @@ sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_fol
 #sbatch "script/clustering/latin_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #sbatch "script/clustering/swedish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 #sbatch "script/clustering/spanish_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
+#bash "script/clustering/norwegian_clustering.sh" "${embeddings_folder}" "${labels_folder}" "${datasets_folder}"
 
 # - LSC measuring --
-##sbatch "script/lsc_measuring/english_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
+#sbatch "script/lsc_measuring/english_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/italian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 #bash "script/lsc_measuring/russian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/german_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 #sbatch "script/lsc_measuring/latin_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/swedish_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 ##bash "script/lsc_measuring/spanish_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
+#bash "script/lsc_measuring/norwegian_measuring.sh" "${embeddings_folder}" "${labels_folder}" "${score_folder}" "${datasets_folder}"
 
 # -- Mix datasets --
 #bash "script/mix_datasets.sh" "${datasets_folder}" "${embeddings_folder}" "${tokenization_folder}" "${attentions_folder}" "${score_folder}" "${labels_folder}"
@@ -92,12 +95,14 @@ sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_fol
 #sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
 #sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
 #sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
+#sbatch "script/brute_force/norwegian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 0
 #sbatch "script/brute_force/english_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 #sbatch "script/brute_force/spanish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 #sbatch "script/brute_force/german_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 #sbatch "script/brute_force/latin_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 #sbatch "script/brute_force/swedish_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 #sbatch "script/brute_force/russian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
+#sbatch "script/brute_force/norwegian_brute_force.sh" "${main_folder_data}" "${brute_force_folder}" 4
 
 
 # -- Attn scores --
@@ -108,3 +113,14 @@ sbatch "script/embedding_extraction/norwegian_extraction.sh" "${tokenization_fol
 #sbatch "script/attn_lsc_measuring/german_attn_measuring.sh" "${attentions_folder}" "${datasets_folder}" "${tokenization_folder}" "${attn_score_folder}"
 #sbatch "script/attn_lsc_measuring/russian_attn_measuring.sh" "${attentions_folder}" "${datasets_folder}" "${tokenization_folder}" "${attn_score_folder}"
 #sbatch "script/attn_lsc_measuring/italian_attn_measuring.sh" "${attentions_folder}" "${datasets_folder}" "${tokenization_folder}" "${attn_score_folder}"
+
+
+# -- WiC --
+#bash "script/download/WiC_en.sh" "${datasets_folder}" "${tokenization_folder}"
+#sbatch "script/embedding_extraction/dwug_en.sh" "${tokenization_folder}" "${embeddings_folder}"	
+#sbatch "script/embedding_extraction/WiC_en.sh" "${tokenization_folder}" "${embeddings_folder}"	
+#bash "script/download/tempoWiC.sh" "${datasets_folder}" "${tokenization_folder}"
+#sbatch "script/embedding_extraction/tempoWiC.sh" "${tokenization_folder}" "${embeddings_folder}"
+#sbatch "script/attention_extraction/tempoWiC.sh" "${tokenization_folder}" "${attentions_folder}"
+sbatch script/brute_force/wic_english_brute_force.sh "${main_folder_data}" "${brute_force_folder}"
+
